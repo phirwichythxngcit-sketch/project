@@ -577,14 +577,72 @@ def name_suffix():
     return f" {n}" if n else ""
 
 
+def parse_top_faculties(text):
+    """Parse '1. ชื่อคณะ (xx.x%) | 2. ...' จากคอลัมน์ top_faculties -> [(name, match)]"""
+    out = []
+    if isinstance(text, str) and text.strip():
+        for part in text.split("|"):
+            m = re.match(r"\s*\d+\.\s*(.+?)\s*\(\s*([\d.]+)\s*%\s*\)", part)
+            if m:
+                out.append((m.group(1), float(m.group(2))))
+    return out
+
+
 def render_history():
     df = load_history()
     st.divider()
     st.subheader("ประวัติผลลัพธ์ที่บันทึกไว้ (results.db)")
     if df.empty:
         st.info("ยังไม่มีข้อมูลที่บันทึกไว้")
-    else:
-        st.dataframe(df)
+        st.warning(EPHEMERAL_WARNING)
+        return
+
+    overview = []
+    for _, r in df.iterrows():
+        tops = parse_top_faculties(r["top_faculties"])
+        overview.append({
+            "_id": r["id"],
+            "ชื่อ": r["name"],
+            "วันเวลา": r["timestamp"],
+            "MBTI ที่ได้": r["mbti_type"],
+            "คณะอันดับ 1": tops[0][0] if tops else "-",
+            "งบที่เลือก": r["budget"],
+        })
+    st.dataframe(pd.DataFrame(overview).drop(columns="_id"))
+
+    labels = [f"{o['ชื่อ']} — {o['วันเวลา']}" for o in overview]
+    sel = st.selectbox("เลือกดูรายละเอียดรายบุคคล (แผนภูมิ 3 แผนภูมิ)", labels)
+    if sel is None:
+        return
+    rec = df.iloc[labels.index(sel)]
+
+    tops = parse_top_faculties(rec["top_faculties"])
+    func_scores = {f: float(rec[f]) for f in FN_ORDER}
+    cat_scores = {c: int(rec[c]) for c in CAT_ORDER}
+    top1_name = tops[0][0] if tops else "-"
+
+    st.markdown(f"**{rec['name']}** · MBTI ใกล้เคียงที่สุด: "
+                f"**{rec['mbti_type']}** · คณะอันดับ 1: **{top1_name}**")
+
+    fig1 = pie_functions(func_scores)
+    fig1.update_layout(title_text="สัดส่วนการใช้ Cognitive Functions")
+    fig2 = pie_categories(cat_scores)
+    fig2.update_layout(title_text="สัดส่วนความถนัด 5 หมวดวิชา")
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.plotly_chart(fig1)
+    with c2:
+        st.plotly_chart(fig2)
+    with c3:
+        if tops:
+            fig3 = pie_top_faculties([{"name": n, "match": v} for n, v in tops])
+            fig3.update_layout(title_text="คณะที่เหมาะกับคุณ",
+                               legend_font_size=9)
+            st.plotly_chart(fig3)
+        else:
+            st.info("ไม่มีข้อมูลคณะที่บันทึกไว้ในแถวนี้")
+
     st.warning(EPHEMERAL_WARNING)
 
 
