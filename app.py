@@ -1,0 +1,636 @@
+# -*- coding: utf-8 -*-
+"""แบบสอบถามแนะแนวคณะ — Streamlit App
+
+ลำดับหน้า (state machine ผ่าน st.session_state["step"]):
+welcome -> mbti_choice -> (mbti_select | function_test) -> mbti_summary
+        -> interest_survey -> budget -> results
+"""
+
+import json
+import re
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+DB_PATH = BASE_DIR / "results.db"
+
+FN_ORDER = ["Ti", "Te", "Fe", "Fi", "Se", "Si", "Ne", "Ni"]
+FN_TH = {
+    "Ti": "การคิดวิเคราะห์เชิงตรรกะภายใน",
+    "Te": "การคิดจัดระเบียบเชิงตรรกะภายนอก",
+    "Fe": "ความรู้สึกเชื่อมโยงภายนอก",
+    "Fi": "ความรู้สึกยึดคุณค่าภายใน",
+    "Se": "การรับรู้ผัสสะในปัจจุบันขณะ",
+    "Si": "การรับรู้ผัสสะเชิงเปรียบเทียบกับอดีต",
+    "Ne": "การหยั่งรู้ความเป็นไปได้หลากหลาย",
+    "Ni": "การหยั่งรู้เชิงวิสัยทัศน์และแก่นแท้",
+}
+CAT_ORDER = ["M", "S", "L", "H", "A"]
+CAT_TH = {
+    "M": "คณิตศาสตร์และคอมพิวเตอร์",
+    "S": "วิทยาศาสตร์และเทคโนโลยี",
+    "L": "ภาษาและวรรณกรรม",
+    "H": "สังคมศึกษาและมนุษยศาสตร์",
+    "A": "ศิลปะ ดนตรี",
+}
+SELF_STRENGTH = [100, 70, 35, 10]  # Dom -> Aux -> Tert -> Inf
+STACK_WEIGHTS = [0.4, 0.3, 0.2, 0.1]
+MAX_STACK_SCORE = 0.30
+SCALE_1_5 = ["1 — ไม่เห็นด้วยอย่างยิ่ง", "2 — ไม่เห็นด้วย", "3 — เฉยๆ / ไม่แน่ใจ",
+             "4 — เห็นด้วย", "5 — เห็นด้วยอย่างยิ่ง"]
+DISCLAIMER = ("นี่คือผลโดยประมาณเพื่อการสำรวจตนเอง "
+              "ไม่ใช่ผลวินิจฉัยที่ตายตัว")
+EPHEMERAL_WARNING = (
+    "**คำเตือน:** ถ้า deploy บน Streamlit Cloud ข้อมูลใน results.db จะหายเมื่อแอปถูก redeploy "
+    "(ephemeral storage) หากต้องการเก็บประวัติถาวร แนะนำให้ใช้ Google Sheets หรือฐานข้อมูลภายนอกแทน")
+
+
+# ---------------------------------------------------------------- data loading
+@st.cache_data(show_spinner=False)
+def load_json(name):
+    with open(DATA_DIR / name, encoding="utf-8-sig") as f:
+        return json.load(f)
+
+
+@st.cache_data(show_spinner=False)
+def parse_function_questions():
+    """Parse MBTI_2.txt -> {func: [10 questions]}"""
+    text = (DATA_DIR / "MBTI_2.txt").read_text(encoding="utf-8-sig")
+    result = {}
+    current = None
+    for line in text.splitlines():
+        m = re.match(r"^##\s+(Ti|Te|Fe|Fi|Se|Si|Ne|Ni)\b", line)
+        if m:
+            current = m.group(1)
+            result[current] = []
+            continue
+        if line.startswith("## "):
+            current = None
+            continue
+        m = re.match(r"^\s*(\d+)\.\s+(.+)$", line)
+        if m and current is not None and len(result[current]) < 10:
+            result[current].append(m.group(2).strip())
+    return {k: v for k, v in result.items() if len(v) == 10}
+
+
+@st.cache_data(show_spinner=False)
+def parse_interest_questions():
+    """Parse ความชอบ2.txt -> {cat: {"title": ..., "questions": [20 items]}}"""
+    text = (DATA_DIR / "ความชอบ2.txt").read_text(encoding="utf-8-sig")
+    titles = {}
+    questions = {}
+    order = []
+    current = None
+    for i, line in enumerate(text.splitlines()):
+        m = re.match(r"^##\s+(\d+)\.\s+(.+)$", line)
+        if m and int(m.group(1)) <= 5:
+            cat = CAT_ORDER[int(m.group(1)) - 1]
+            current = cat
+            titles[cat] = m.group(2).strip()
+            questions[cat] = []
+            order.append(cat)
+            continue
+        m = re.match(r"^\s*(\d+)\.\s+(.+)$", line)
+        if m and current is not None and len(questions[current]) < 20:
+            questions[current].append(m.group(2).strip())
+    return ({c: {"title": titles[c], "questions": questions[c]}
+             for c in order if len(questions[c]) == 20})
+
+
+FACULTY_DB = load_json("faculty_database_v2.json")
+MBTI_TYPES = load_json("mbti_type_descriptions.json")
+BUDGET_TIERS = FACULTY_DB["budgetTiers"]
+FACULTIES = FACULTY_DB["facultyDatabase"]
+
+
+# ---------------------------------------------------------------- scoring core
+def strengths_from_type(type_code):
+    """เส้นทาง 'เลือกเอง': stack Dom->Aux->Tert->Inf => [100,70,35,10], นอก stack = 0"""
+    stack = MBTI_TYPES[type_code]["stack"]
+    s = {f: 0 for f in FN_ORDER}
+    for f, v in zip(stack, SELF_STRENGTH):
+        s[f] = float(v)
+    return s
+
+
+def strengths_from_raw(raw_scores):
+    """เส้นทาง 'ทำแบบทดสอบ': normalize (raw-10)/40*100"""
+    return {f: round((raw_scores[f] - 10) / 40 * 100, 1) for f in FN_ORDER}
+
+
+def closest_mbti_type(strengths):
+    """Weighted stack similarity: เรียง 8 ฟังก์ชันจากมากไปน้อย เทียบ stack 16 type
+    ด้วยน้ำหนักตำแหน่ง [0.4,0.3,0.2,0.1] normalize ด้วย MAX_SCORE=0.30"""
+    top4 = sorted(FN_ORDER, key=lambda f: strengths[f], reverse=True)[:4]
+    best_type, best_sim = None, -1.0
+    for code, info in MBTI_TYPES.items():
+        score = sum(w for w, u, t in zip(STACK_WEIGHTS, top4, info["stack"]) if u == t)
+        sim = min(score / MAX_STACK_SCORE, 1.0)
+        if sim > best_sim:
+            best_type, best_sim = code, sim
+    return best_type, round(best_sim * 100, 1), top4
+
+
+def mbti_score(fac, strengths):
+    funcs = fac["functions"]
+    scope = fac.get("scope", "D/A")
+    da = max(strengths[f] for f in funcs)  # scope D/A -> max
+    if scope == "D/A":
+        return da
+    dominant = max(FN_ORDER, key=lambda f: strengths[f])
+    dom_method = da if dominant in funcs else da * 0.5
+    if scope == "Dominant":
+        return dom_method
+    return max(da, dom_method)  # Mixed
+
+
+def subj_score(fac, cat_scores):
+    ratios = [min(cat_scores[c["cat"]] / c["min"] * 100, 100)
+              for c in fac["conditions"]]
+    return min(ratios)
+
+
+def build_reason(fac, strengths, cat_scores):
+    parts = []
+    fn_pairs = sorted(((f, round(strengths[f])) for f in fac["functions"]),
+                      key=lambda x: -x[1])
+    strong = [f"{f} {v}%" for f, v in fn_pairs[:2] if v >= 50]
+    if strong:
+        parts.append("ฟังก์ชันเด่นตรง: " + ", ".join(strong))
+    for c in fac["conditions"]:
+        ok = "ผ่าน" if cat_scores[c["cat"]] >= c["min"] else "ไม่ผ่าน"
+        parts.append(f"{c['cat']} {ok} ({round(cat_scores[c['cat']])}/{c['min']})")
+    return " · ".join(parts)
+
+
+def rank_faculties(strengths, cat_scores):
+    rows = []
+    for fac in FACULTIES:
+        ms = mbti_score(fac, strengths)
+        ss = subj_score(fac, cat_scores)
+        match = round(0.3 * ms + 0.7 * ss, 1)
+        rows.append({
+            "name": fac["name"],
+            "group": fac["group"],
+            "mbtiScore": round(ms, 1),
+            "subjScore": round(ss, 1),
+            "match": match,
+            "reason": build_reason(fac, strengths, cat_scores),
+            "uni": fac["budget"].get(st.session_state.get("budget_tier"), "-"),
+            "_fac": fac,
+        })
+    rows.sort(key=lambda r: (-r["match"], -r["subjScore"], r["name"]))
+    return rows
+
+
+# ---------------------------------------------------------------- sqlite
+def init_db(db_path=DB_PATH):
+    conn = sqlite3.connect(db_path)
+    conn.execute("""CREATE TABLE IF NOT EXISTS results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT,
+        name TEXT,
+        mbti_method TEXT,
+        mbti_type TEXT,
+        Ti REAL, Te REAL, Fe REAL, Fi REAL,
+        Se REAL, Si REAL, Ne REAL, Ni REAL,
+        M INTEGER, S INTEGER, L INTEGER, H INTEGER, A INTEGER,
+        budget TEXT,
+        top_faculties TEXT)""")
+    conn.commit()
+    return conn
+
+
+def save_result(payload, db_path=DB_PATH):
+    conn = init_db(db_path)
+    cols = ",".join(payload.keys())
+    marks = ",".join("?" * len(payload))
+    conn.execute(f"INSERT INTO results ({cols}) VALUES ({marks})",
+                 tuple(payload.values()))
+    conn.commit()
+    rid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.close()
+    return rid
+
+
+def load_history(db_path=DB_PATH):
+    if not Path(db_path).exists():
+        return pd.DataFrame()
+    conn = sqlite3.connect(db_path)
+    try:
+        df = pd.read_sql("SELECT * FROM results ORDER BY id DESC", conn)
+    finally:
+        conn.close()
+    return df
+
+
+# ---------------------------------------------------------------- chart helpers
+def pie_functions(strengths):
+    labels = [f"{f} — {FN_TH[f]}" for f in FN_ORDER]
+    fig = px.pie(names=labels, values=[strengths[f] for f in FN_ORDER],
+                 hole=0.4, color_discrete_sequence=px.colors.qualitative.Set2)
+    fig.update_layout(title_text="สัดส่วนการใช้ Cognitive Functions ของคุณ",
+                      title_x=0.5, legend_font_size=11)
+    return fig
+
+
+def pie_categories(cat_scores):
+    labels = [f"{c} — {CAT_TH[c]}" for c in CAT_ORDER]
+    fig = px.pie(names=labels, values=[cat_scores[c] for c in CAT_ORDER],
+                 hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+    fig.update_layout(title_text="ความถนัด 5 หมวด (M, S, L, H, A)", title_x=0.5,
+                      legend_font_size=11)
+    return fig
+
+
+def pie_top_faculties(rows):
+    top = rows[:5]
+    fig = px.pie(names=[f"{r['name']} ({r['match']}%)" for r in top],
+                 values=[r["match"] for r in top], hole=0.4,
+                 color_discrete_sequence=px.colors.qualitative.Bold)
+    fig.update_layout(title_text="5 คณะที่ Match % สูงสุด", title_x=0.5,
+                      legend_font_size=11)
+    return fig
+
+
+# ---------------------------------------------------------------- session state
+def init_session():
+    defaults = {
+        "step": "welcome",
+        "name": "",
+        "mbti_route": None,       # "self" | "test"
+        "chosen_type": None,
+        "fn_index": 0,
+        "func_raw": {},
+        "function_strengths": None,
+        "derived_type": None,
+        "type_similarity": None,
+        "interest_index": 0,
+        "interest_answers": {},
+        "cat_scores": None,
+        "budget_tier": None,
+        "saved_id": None,
+        "show_history": False,
+    }
+    for k, v in defaults.items():
+        st.session_state.setdefault(k, v)
+
+
+def goto(step):
+    st.session_state["step"] = step
+    st.rerun()
+
+
+def nav_back(step):
+    if st.button("← ย้อนกลับ"):
+        goto(step)
+
+
+# ---------------------------------------------------------------- pages
+def page_welcome():
+    st.title("แบบสอบถามแนะแนวคณะ")
+    st.markdown(
+        """
+        แอปนี้ช่วยให้คุณรู้จักตัวเองมากขึ้น แล้วจับคู่กับ **คณะ/สาขาที่เหมาะกับคุณ**
+        ผ่าน 3 ชิ้นประกอบ:
+
+        1. **Cognitive Functions (MBTI)** — เลือก type ที่รู้แล้ว หรือทำแบบทดสอบ 80 ข้อ
+        2. **ความสนใจและความถนัด** — แบบสำรวจ 5 หมวด (100 ข้อ แบ่ง 5 หน้า)
+        3. **งบประมาณการศึกษา** — เพื่อแนะนำมหาวิทยาลัยที่เหมาะกับกำลังจ่าย
+
+        ใช้เวลารวมประมาณ 15–25 นาที ไม่มีคำตอบถูกหรือผิด ตอบตามความจริงใจของตัวเองได้เลย
+        """
+    )
+    name = st.text_input("ชื่อ / ชื่อเล่น", value=st.session_state["name"])
+    if st.button("เริ่ม", type="primary", disabled=(not name.strip())):
+        st.session_state["name"] = name.strip()
+        goto("mbti_choice")
+
+
+def page_mbti_choice():
+    st.header("ผล MBTI ของคุณมาจากไหน?")
+    choice = st.radio(
+        "เลือกทางเลือกที่ตรงกับคุณ:",
+        options=["ฉันรู้ผล MBTI ของตัวเองอยู่แล้ว (จะเลือกเอง)",
+                 "ฉันยังไม่รู้ อยากทำแบบทดสอบ Cognitive Functions (80 ข้อ)"],
+        index=None,
+    )
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        nav_back("welcome")
+    with c2:
+        if st.button("ถัดไป →", type="primary", disabled=(choice is None)):
+            if choice.startswith("ฉันรู้ผล"):
+                st.session_state["mbti_route"] = "self"
+                goto("mbti_select")
+            else:
+                st.session_state["mbti_route"] = "test"
+                st.session_state["fn_index"] = 0
+                st.session_state["func_raw"] = {}
+                goto("function_test")
+
+
+def page_mbti_select():
+    st.header("เลือกประเภท MBTI ของคุณ")
+    options = [f"{code} — {info['title']}" for code, info in MBTI_TYPES.items()]
+    sel = st.selectbox("ประเภท MBTI (16 แบบ)", options, index=None,
+                       placeholder="— เลือกประเภท —")
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        nav_back("mbti_choice")
+    with c2:
+        if st.button("ยืนยันและดูสรุป →", type="primary", disabled=(sel is None)):
+            code = sel.split(" — ")[0]
+            st.session_state["chosen_type"] = code
+            st.session_state["derived_type"] = code
+            st.session_state["type_similarity"] = None
+            st.session_state["function_strengths"] = strengths_from_type(code)
+            goto("mbti_summary")
+
+
+def page_function_test(fn_questions):
+    idx = st.session_state["fn_index"]
+    func = FN_ORDER[idx]
+    done = len(st.session_state["func_raw"])
+    st.progress(done / 8, text=f"ความคืบหน้า {done}/8 ฟังก์ชัน")
+    st.header(f"ฟังก์ชัน {func} — {FN_TH[func]}")
+    st.caption(f"หน้า {idx + 1} / 8 · ข้อ {idx * 10 + 1}–{idx * 10 + 10}")
+
+    unanswered = []
+    for i, q in enumerate(fn_questions[func]):
+        key = f"ans_{func}_{i}"
+        val = st.radio(f"{idx * 10 + i + 1}. {q}", SCALE_1_5, index=None,
+                       key=key, horizontal=False)
+        if val is None:
+            unanswered.append(idx * 10 + i + 1)
+
+    label = ("เสร็จสิ้น — ดูผล MBTI" if idx == 7 else "ถัดไป (ฟังก์ชันถัดไป)")
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        if st.button("← ฟังก์ชันก่อนหน้า", disabled=(idx == 0)):
+            st.session_state["fn_index"] -= 1
+            st.rerun()
+    with c2:
+        if st.button(label, type="primary"):
+            if unanswered:
+                st.warning("กรุณาตอบให้ครบทุกข้อก่อนไปต่อ "
+                           "(ข้อที่ยังไม่ได้ตอบ: "
+                           + ", ".join(map(str, unanswered)) + ")")
+            else:
+                raw = sum(int(st.session_state[f"ans_{func}_{i}"][0]) for i in range(10))
+                st.session_state["func_raw"][func] = raw
+                if idx == 7:
+                    st.session_state["function_strengths"] = \
+                        strengths_from_raw(st.session_state["func_raw"])
+                    best, sim, _ = closest_mbti_type(st.session_state["function_strengths"])
+                    st.session_state["derived_type"] = best
+                    st.session_state["type_similarity"] = sim
+                    goto("mbti_summary")
+                else:
+                    st.session_state["fn_index"] += 1
+                    st.rerun()
+
+
+def page_mbti_summary():
+    route = st.session_state["mbti_route"]
+    code = st.session_state["derived_type"]
+    info = MBTI_TYPES[code]
+    st.subheader(f"สรุปผล MBTI ของคุณ{name_suffix()}")
+
+    if route == "self":
+        st.success(f"คุณเลือกประเภทของตัวเอง: **{code} — {info['title']}**")
+    else:
+        sim = st.session_state["type_similarity"]
+        st.success(f"จากแบบทดสอบ ประเภทที่ใกล้เคียงที่สุดของคุณคือ "
+                   f"**{code} — {info['title']}** (ความเข้ากันได้ ~{sim}%)")
+
+    st.markdown(info["desc"])
+
+    strengths = st.session_state["function_strengths"]
+    top4 = sorted(FN_ORDER, key=lambda f: strengths[f], reverse=True)[:4]
+    st.info("Function Stack ของคุณ: "
+            + " → ".join(f"{f} ({strengths[f]:.0f}%)" for f in top4))
+
+    st.plotly_chart(pie_functions(strengths))
+
+    st.caption(DISCLAIMER)
+
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        if st.button("← เปลี่ยนวิธีหา MBTI"):
+            for k in ("mbti_route", "chosen_type", "derived_type",
+                      "type_similarity", "function_strengths"):
+                st.session_state[k] = None
+            st.session_state["func_raw"] = {}
+            goto("mbti_choice")
+    with c2:
+        if st.button("ทำแบบสำรวจความถนัดต่อ →", type="primary"):
+            st.session_state["interest_index"] = 0
+            goto("interest_survey")
+
+
+def page_interest_survey(survey):
+    idx = st.session_state["interest_index"]
+    cat = CAT_ORDER[idx]
+    block = survey[cat]
+    st.progress(len(st.session_state["interest_answers"]) / 5,
+                text=f"หมวดที่ {len(st.session_state['interest_answers'])}/5 เสร็จสิ้น")
+    st.header(f"หมวด {idx + 1}/5: {block['title']}")
+    st.caption("ให้คะแนนแต่ละข้อ 1–5 (1 = ไม่ใช่เลย, 5 = ใช่มากที่สุด)")
+
+    answers = st.session_state["interest_answers"].get(cat, {})
+    unanswered = []
+    for i, q in enumerate(block["questions"]):
+        key = f"in_{cat}_{i}"
+        default = answers.get(i)
+        d_idx = default - 1 if isinstance(default, int) else None
+        val = st.radio(f"{i + 1}. {q}", SCALE_1_5, index=d_idx, key=key)
+        if val is None:
+            unanswered.append(i + 1)
+
+    label = "เสร็จสิ้นหมวดนี้ — ไปเลือกงบประมาณ" if idx == 4 else "ถัดไป (หมวดถัดไป)"
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        if st.button("← หมวดก่อนหน้า", disabled=(idx == 0)):
+            st.session_state["interest_index"] -= 1
+            st.rerun()
+    with c2:
+        if st.button(label, type="primary"):
+            if unanswered:
+                st.warning("กรุณาตอบให้ครบทุกข้อก่อนไปต่อ "
+                           "(ข้อที่ยังไม่ได้ตอบ: "
+                           + ", ".join(map(str, unanswered)) + ")")
+            else:
+                vals = [int(st.session_state[f"in_{cat}_{i}"][0]) for i in range(20)]
+                st.session_state["interest_answers"][cat] = vals
+                if idx == 4:
+                    st.session_state["cat_scores"] = {
+                        c: sum(v) for c, v in st.session_state["interest_answers"].items()}
+                    goto("budget")
+                else:
+                    st.session_state["interest_index"] += 1
+                    st.rerun()
+
+
+def page_budget():
+    st.header("ระดับงบประมาณการศึกษาต่อเทอม")
+    st.caption("เกณฑ์กำลังจ่ายจริงของครอบครัว (จาก การเงิน.txt) — B1 ≤15,000 / "
+               "B2 15,001–40,000 / B3 ≥40,001 บาท/เทอม")
+    tier_keys = ["B1", "B2", "B3"]
+    opts = [f"{t['label']} — {t['desc']}" for t in
+            (BUDGET_TIERS[k] for k in tier_keys)]
+    sel = st.radio("เลือกระดับงบ:", opts, index=None)
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        nav_back("interest_survey")
+    with c2:
+        if st.button("ยืนยันและดูผลลัพธ์ →", type="primary", disabled=(sel is None)):
+            st.session_state["budget_tier"] = tier_keys[opts.index(sel)]
+            goto("results")
+
+
+def page_results():
+    strengths = st.session_state["function_strengths"]
+    cat_scores = st.session_state["cat_scores"]
+    budget = st.session_state.get("budget_tier")
+    rows = rank_faculties(strengths, cat_scores)
+    tier_desc = BUDGET_TIERS[budget]["label"]
+
+    st.header(f"ผลลัพธ์ของ{name_suffix()}")
+    st.success(f"MBTI: **{st.session_state['derived_type']}** · "
+               f"งบ: **{budget} ({tier_desc})**")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.plotly_chart(pie_functions(strengths))
+    with col2:
+        st.plotly_chart(pie_categories(cat_scores))
+    with col3:
+        st.plotly_chart(pie_top_faculties(rows))
+
+    st.subheader("คณะแนะนำ 10 อันดับแรก")
+    table = pd.DataFrame([
+        {"อันดับ": i + 1, "คณะ/สาขา": r["name"], "Match %": r["match"],
+         "MBTI Score": r["mbtiScore"], "Subj Score": r["subjScore"],
+         "เหตุผล": r["reason"], f"ตัวอย่างมหาวิทยาลัย ({budget})": r["uni"]}
+        for i, r in enumerate(rows[:10])
+    ])
+    st.table(table)
+
+    for i, r in enumerate(rows[:3], start=1):
+        fac = r["_fac"]
+        with st.expander(f"#{i} {r['name']} — Match {r['match']}%"):
+            st.write("**ฟังก์ชันที่ต้องการ:** "
+                     + ", ".join(fac["functions"]) + f" (scope: {fac['scope']})")
+            st.write("**เงื่อนไขความถนัด:** "
+                     + "; ".join(f"{c['cat']} ≥ {c['min']}" for c in fac["conditions"]))
+            for k in tier_keys_all():
+                b = fac["budget"].get(k, "-")
+                t = BUDGET_TIERS[k]
+                st.write(f"- **{k} ({t['label']})**: {b}")
+
+    st.divider()
+    st.subheader("บันทึกผลลัพธ์")
+    st.caption(EPHEMERAL_WARNING)
+    if st.session_state.get("saved_id") is not None:
+        st.info(f"บันทึกเรียบร้อยแล้ว (record id = {st.session_state['saved_id']})")
+    else:
+        if st.button("บันทึกผลลัพธ์ลง SQLite (results.db)", type="primary"):
+            payload = {
+                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                "name": st.session_state["name"],
+                "mbti_method": "เลือกเอง" if st.session_state["mbti_route"] == "self"
+                               else "ทำแบบทดสอบ",
+                "mbti_type": st.session_state["derived_type"],
+                **{f: round(strengths[f], 1) for f in FN_ORDER},
+                **{c: int(cat_scores[c]) for c in CAT_ORDER},
+                "budget": budget,
+                "top_faculties": " | ".join(
+                    f"{i}. {r['name']} ({r['match']}%)" for i, r in enumerate(rows[:3], 1)),
+            }
+            try:
+                st.session_state["saved_id"] = save_result(payload)
+                st.success(f"บันทึกสำเร็จ (record id = {st.session_state['saved_id']})")
+            except Exception as e:
+                st.error(f"บันทึกไม่สำเร็จ: {e}")
+
+    if st.button("เริ่มใหม่ทั้งหมด"):
+        for k in list(st.session_state.keys()):
+            if k not in ("show_history",):
+                del st.session_state[k]
+        goto("welcome")
+
+
+def tier_keys_all():
+    return ["B1", "B2", "B3"]
+
+
+def name_suffix():
+    n = st.session_state.get("name")
+    return f" {n}" if n else ""
+
+
+def render_history():
+    df = load_history()
+    st.divider()
+    st.subheader("ประวัติผลลัพธ์ที่บันทึกไว้ (results.db)")
+    if df.empty:
+        st.info("ยังไม่มีข้อมูลที่บันทึกไว้")
+    else:
+        st.dataframe(df)
+    st.warning(EPHEMERAL_WARNING)
+
+
+# ---------------------------------------------------------------- main
+def main():
+    st.set_page_config(page_title="แนะแนวคณะ", layout="wide")
+    init_session()
+
+    fn_questions = parse_function_questions()
+    survey = parse_interest_questions()
+
+    with st.sidebar:
+        st.header("แบบสอบถามแนะแนวคณะ")
+        done_flags = [
+            ("1. เริ่มต้น", bool(st.session_state["name"])),
+            ("2. ผล MBTI", st.session_state["function_strengths"] is not None),
+            ("3. ความถนัด", st.session_state["cat_scores"] is not None),
+            ("4. งบประมาณ", st.session_state["budget_tier"] is not None),
+            ("5. ผลลัพธ์", st.session_state["step"] == "results"),
+        ]
+        for label, ok in done_flags:
+            st.write(("✔ " if ok else "○ ") + label)
+        if st.session_state["name"]:
+            st.write(f"ผู้ใช้: **{st.session_state['name']}**")
+        st.checkbox("ประวัติผลลัพธ์", key="show_history")
+
+    if st.session_state.get("show_history"):
+        render_history()
+
+    step = st.session_state["step"]
+    if step == "welcome":
+        page_welcome()
+    elif step == "mbti_choice":
+        page_mbti_choice()
+    elif step == "mbti_select":
+        page_mbti_select()
+    elif step == "function_test":
+        page_function_test(fn_questions)
+    elif step == "mbti_summary":
+        page_mbti_summary()
+    elif step == "interest_survey":
+        page_interest_survey(survey)
+    elif step == "budget":
+        page_budget()
+    elif step == "results":
+        page_results()
+
+
+if __name__ == "__main__":
+    main()
