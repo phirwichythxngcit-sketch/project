@@ -41,7 +41,7 @@ CAT_TH = {
 }
 SELF_STRENGTH = [100, 70, 35, 10]  # Dom -> Aux -> Tert -> Inf
 STACK_WEIGHTS = [0.4, 0.3, 0.2, 0.1]
-MAX_STACK_SCORE = 0.30
+MAX_STACK_SCORE = sum(STACK_WEIGHTS)
 SCALE_1_5 = ["1 — ไม่เห็นด้วยอย่างยิ่ง", "2 — ไม่เห็นด้วย", "3 — เฉยๆ / ไม่แน่ใจ",
              "4 — เห็นด้วย", "5 — เห็นด้วยอย่างยิ่ง"]
 DISCLAIMER = ("นี่คือผลโดยประมาณเพื่อการสำรวจตนเอง "
@@ -124,14 +124,19 @@ def strengths_from_raw(raw_scores):
     return {f: round((raw_scores[f] - 10) / 40 * 100, 1) for f in FN_ORDER}
 
 
+def stack_similarity(top4, stack):
+    """Return weighted positional similarity for two four-function stacks (0–1)."""
+    score = sum(w for w, user_fn, type_fn
+                in zip(STACK_WEIGHTS, top4, stack) if user_fn == type_fn)
+    return score / MAX_STACK_SCORE
+
+
 def closest_mbti_type(strengths):
-    """Weighted stack similarity: เรียง 8 ฟังก์ชันจากมากไปน้อย เทียบ stack 16 type
-    ด้วยน้ำหนักตำแหน่ง [0.4,0.3,0.2,0.1] normalize ด้วย MAX_SCORE=0.30"""
+    """Find the closest MBTI stack using weighted positional similarity."""
     top4 = sorted(FN_ORDER, key=lambda f: strengths[f], reverse=True)[:4]
     best_type, best_sim = None, -1.0
     for code, info in MBTI_TYPES.items():
-        score = sum(w for w, u, t in zip(STACK_WEIGHTS, top4, info["stack"]) if u == t)
-        sim = min(score / MAX_STACK_SCORE, 1.0)
+        sim = stack_similarity(top4, info["stack"])
         if sim > best_sim:
             best_type, best_sim = code, sim
     return best_type, round(best_sim * 100, 1), top4
@@ -143,11 +148,19 @@ def mbti_score(fac, strengths):
     da = max(strengths[f] for f in funcs)  # scope D/A -> max
     if scope == "D/A":
         return da
+    if scope == "Mixed":
+        function_scopes = fac.get("functionScopes")
+        if function_scopes:
+            da_funcs = function_scopes.get("D/A", [])
+            dominant_funcs = function_scopes.get("Dominant", [])
+            da_score = max((strengths[f] for f in da_funcs), default=0)
+            dominant = max(FN_ORDER, key=lambda f: strengths[f])
+            dominant_score = strengths[dominant] if dominant in dominant_funcs else 0
+            return max(da_score, dominant_score)
+        return da  # Backward compatibility for legacy Mixed records.
     dominant = max(FN_ORDER, key=lambda f: strengths[f])
     dom_method = da if dominant in funcs else da * 0.5
-    if scope == "Dominant":
-        return dom_method
-    return max(da, dom_method)  # Mixed
+    return dom_method
 
 
 def subj_score(fac, cat_scores):
@@ -291,6 +304,15 @@ def goto(step):
 def nav_back(step):
     if st.button("← ย้อนกลับ"):
         goto(step)
+
+
+def saved_answer_at(answers, index):
+    """Return a previously saved survey answer from either legacy dict or list data."""
+    if isinstance(answers, list):
+        return answers[index] if 0 <= index < len(answers) else None
+    if isinstance(answers, dict):
+        return answers.get(index)
+    return None
 
 
 # ---------------------------------------------------------------- pages
@@ -449,7 +471,7 @@ def page_interest_survey(survey):
     unanswered = []
     for i, q in enumerate(block["questions"]):
         key = f"in_{cat}_{i}"
-        default = answers.get(i)
+        default = saved_answer_at(answers, i)
         d_idx = default - 1 if isinstance(default, int) else None
         val = st.radio(f"{i + 1}. {q}", SCALE_1_5, index=d_idx, key=key)
         if val is None:
