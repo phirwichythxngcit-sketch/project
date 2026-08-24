@@ -564,7 +564,6 @@ def page_results():
 
     st.divider()
     st.subheader("บันทึกผลลัพธ์")
-    st.caption(EPHEMERAL_WARNING)
     if st.session_state.get("saved_id") is not None:
         st.info(f"บันทึกเรียบร้อยแล้ว (record id = {st.session_state['saved_id']})")
     else:
