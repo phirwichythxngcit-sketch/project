@@ -4,7 +4,7 @@
 รับค่า type (เช่น "INTJ") จากแบบทดสอบ แล้วแสดง:
   1) ชื่อ type + nickname + คำอธิบาย
   2) Function stack 4 ตำแหน่ง เป็นการ์ดสี (Dominant -> Inferior)
-  3) Tabs: จุดแข็ง-จุดอ่อน / คำแนะนำพัฒนาตนเอง
+  3) จุดแข็ง / จุดที่ควรพัฒนา แบบสองคอลัมน์
 
 ธีมสีแยกตามกลุ่ม: Analysts=ม่วง, Diplomats=เขียว,
 Sentinels=น้ำเงิน, Explorers=ส้ม (ดูที่ mbti_data.py)
@@ -36,9 +36,8 @@ def _render_header(t: str, info: dict, group: dict, color: str) -> None:
         """,
         unsafe_allow_html=True,
     )
-    # ชื่อ type + nickname (EN/TH)
+    # ชื่อ type + nickname
     st.header(f"{t} — {info['nickname']}")
-    st.subheader(info['nickname_th'])
     st.caption(info["description"])
 
 
@@ -74,33 +73,18 @@ def _render_stack(t: str, color: str) -> None:
             st.markdown(card_html, unsafe_allow_html=True)
 
 
-def _render_tabs(t: str, color: str) -> None:
-    """Tabs แสดงจุดแข็ง-จุดอ่อน และคำแนะนำพัฒนาตนเอง"""
+def _render_strengths_weaknesses(t: str) -> None:
+    """จุดแข็ง (ซ้าย) เทียบกับ จุดที่ควรพัฒนา (ขวา)"""
     info = MBTI_DATA[t]
-    tab_sw, tab_growth = st.tabs(["จุดแข็ง – จุดอ่อน", "คำแนะนำการพัฒนาตนเอง"])
-
-    # Tab 1: จุดแข็ง (ซ้าย) vs จุดอ่อน (ขวา) เทียบกัน
-    with tab_sw:
-        col_s, col_w = st.columns(2)
-        with col_s:
-            st.markdown("#### ✅ จุดแข็ง")
-            for item in info["strengths"]:
-                st.markdown(f"- {item}")
-        with col_w:
-            st.markdown("#### ⚠️ จุดอ่อน")
-            for item in info["weaknesses"]:
-                st.markdown(f"- {item}")
-
-    # Tab 2: คำแนะนำการพัฒนาตนเอง
-    with tab_growth:
-        for i, tip in enumerate(info["growth_tips"], start=1):
-            st.markdown(
-                '<div style="background:%s; border-left:5px solid %s; '
-                'border-radius:12px; padding:12px 16px; margin-bottom:10px;">'
-                "<b>💡 ข้อ %d:</b><br>%s</div>"
-                % (_rgba(color, 0.10), color, i, tip),
-                unsafe_allow_html=True,
-            )
+    col_s, col_w = st.columns(2)
+    with col_s:
+        st.markdown("#### ✅ จุดแข็ง")
+        for item in info["strengths"]:
+            st.markdown(f"- {item}")
+    with col_w:
+        st.markdown("#### ⚠️ จุดที่ควรพัฒนา")
+        for item in info["weaknesses"]:
+            st.markdown(f"- {item}")
 
 
 def display_mbti_result(mbti_type: str) -> None:
@@ -131,7 +115,7 @@ def display_mbti_result(mbti_type: str) -> None:
     _render_stack(t, color)
 
     st.markdown("---")
-    _render_tabs(t, color)
+    _render_strengths_weaknesses(t)
 
 
 if __name__ == "__main__":

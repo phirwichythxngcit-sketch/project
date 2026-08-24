@@ -450,7 +450,7 @@ def page_mbti_summary():
         st.success(f"จากแบบทดสอบ ประเภทที่ใกล้เคียงที่สุดของคุณคือ "
                    f"**{code} — {info['title']}** (ความเข้ากันได้ ~{sim}%)")
 
-    # หน้าแสดงผลลัพธ์ MBTI แบบละเอียด (nickname, function stack, tabs)
+    # หน้าแสดงผลลัพธ์ MBTI แบบละเอียด (nickname, function stack, จุดแข็ง–จุดที่ควรพัฒนา)
     display_mbti_result(code)
 
     st.caption(DISCLAIMER)
