@@ -53,6 +53,16 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+## การตั้งค่าผู้ดูแลสำหรับประวัติผลลัพธ์
+
+ประวัติผลลัพธ์จะซ่อนจากผู้ชมทั่วไปโดยอัตโนมัติ ผู้ดูแลต้องกำหนดรหัสผ่านใน Streamlit Secrets ก่อน:
+
+```toml
+ADMIN_PASSWORD = "ตั้งรหัสผ่านที่คาดเดายาก"
+```
+
+บน Streamlit Cloud ให้เปิด **App settings → Secrets** แล้วเพิ่มค่านี้ จากนั้นผู้ดูแลจะเห็นช่อง “สำหรับผู้ดูแล” ที่ sidebar เพื่อเข้าสู่ระบบและดูประวัติ
+
 ## Deploy บน Streamlit Cloud
 
 1. Push โปรเจกต์ขึ้น GitHub (repo public, `.gitignore` กันไฟล์ `*.db` ไว้แล้ว)

@@ -6,6 +6,7 @@ welcome -> mbti_choice -> (mbti_select | function_test) -> mbti_summary
         -> interest_survey -> budget -> results
 """
 
+import hmac
 import json
 import re
 import sqlite3
@@ -291,6 +292,7 @@ def init_session():
         "saved_id": None,
         "show_history": False,
         "show_calc": False,
+        "admin_authenticated": False,
     }
     for k, v in defaults.items():
         st.session_state.setdefault(k, v)
@@ -313,6 +315,20 @@ def saved_answer_at(answers, index):
     if isinstance(answers, dict):
         return answers.get(index)
     return None
+
+
+def admin_password():
+    """Return the configured Streamlit Secrets password, if one exists."""
+    try:
+        return st.secrets.get("ADMIN_PASSWORD")
+    except FileNotFoundError:
+        return None
+
+
+def is_admin_password(password):
+    """Check an administrator password stored only in Streamlit Secrets."""
+    expected = admin_password()
+    return bool(expected) and hmac.compare_digest(password, expected)
 
 
 # ---------------------------------------------------------------- pages
@@ -792,12 +808,27 @@ def main():
         if st.session_state["name"]:
             st.write(f"ผู้ใช้: **{st.session_state['name']}**")
         st.checkbox("วิธีคำนวณ", key="show_calc")
-        st.checkbox("ประวัติผลลัพธ์", key="show_history")
+        if st.session_state["admin_authenticated"]:
+            st.checkbox("ประวัติผลลัพธ์", key="show_history")
+            if st.button("ออกจากโหมดผู้ดูแล"):
+                st.session_state["admin_authenticated"] = False
+                st.session_state["show_history"] = False
+                st.rerun()
+        elif admin_password():
+            with st.expander("สำหรับผู้ดูแล"):
+                password = st.text_input("รหัสผ่านผู้ดูแล", type="password")
+                if st.button("เข้าสู่ระบบผู้ดูแล"):
+                    if is_admin_password(password):
+                        st.session_state["admin_authenticated"] = True
+                        st.rerun()
+                    else:
+                        st.error("รหัสผ่านไม่ถูกต้อง")
 
     if st.session_state.get("show_calc"):
         render_calc_explanation()
 
-    if st.session_state.get("show_history"):
+    if (st.session_state.get("show_history")
+            and st.session_state.get("admin_authenticated")):
         render_history()
 
     step = st.session_state["step"]

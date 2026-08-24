@@ -51,6 +51,21 @@ class MixedScopeTests(unittest.TestCase):
         self.assertEqual(app.mbti_score(self.architecture, strengths), 80)
 
 
+class AdminHistoryAccessTests(unittest.TestCase):
+    def setUp(self):
+        self.original_secrets = app.st.secrets
+        app.st.secrets = {"ADMIN_PASSWORD": "strong-test-password"}
+
+    def tearDown(self):
+        app.st.secrets = self.original_secrets
+
+    def test_correct_password_authenticates_admin(self):
+        self.assertTrue(app.is_admin_password("strong-test-password"))
+
+    def test_wrong_password_cannot_authenticate_admin(self):
+        self.assertFalse(app.is_admin_password("incorrect-password"))
+
+
 class StackSimilarityTests(unittest.TestCase):
     def test_exact_stack_is_100_percent(self):
         self.assertEqual(app.stack_similarity(
