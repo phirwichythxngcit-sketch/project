@@ -1,3 +1,8 @@
 [theme]
 base = "light"
-primaryColor = "#4C6EF5"
+# Teal เชื่อถือได้ + พื้นครีมอบอุ่น เป็นมิตรกับวัยรุ่น (ไม่ corporate จ๋า)
+primaryColor = "#0F766E"
+backgroundColor = "#FBF8F1"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#25333B"
+font = "sans serif"

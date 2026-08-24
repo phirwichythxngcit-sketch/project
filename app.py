@@ -7,6 +7,7 @@ welcome -> mbti_choice -> (mbti_select | function_test) -> mbti_summary
 """
 
 import hmac
+import html
 import json
 import re
 import sqlite3
@@ -49,6 +50,140 @@ SCALE_1_5 = ["1 — ไม่เห็นด้วยอย่างยิ่ง
              "4 — เห็นด้วย", "5 — เห็นด้วยอย่างยิ่ง"]
 DISCLAIMER = ("นี่คือผลโดยประมาณเพื่อการสำรวจตนเอง "
               "ไม่ใช่ผลวินิจฉัยที่ตายตัว")
+
+# พาเลตต์ประจำแอป (teal-อบอุ่น + สีร้องเรียกแบบนุ่ม) ใช้ทั้ง pie chart และ UI
+PIE_COLORS = ["#2A9D8F", "#E9C46A", "#E76F51", "#355070",
+              "#6D597A", "#B56576", "#84A59D", "#F4A261"]
+
+APP_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=Sarabun:wght@400;500;600;700&display=swap');
+
+:root{--ink:#25333B;--line:rgba(37,51,59,.14);--teal:#0F766E;}
+
+/* ---------- typography : Prompt หัวข้อ / Sarabun เนื้อความ ---------- */
+.stApp, .stMarkdown p, li, td, th, .stRadio, .stButton, .stTextInput, .stSelectbox,
+.stMultiselect, [data-testid="stExpander"]{
+    font-family:'Sarabun','Noto Sans Thai',system-ui,sans-serif;color:var(--ink);}
+h1,h2,h3,h4,h5,.stMarkdown h1,.stMarkdown h2,.stMarkdown h3,.stMarkdown h4,
+[data-testid="stExpander"] summary{
+    font-family:'Prompt','Sarabun',sans-serif;}
+h1,h2{letter-spacing:.005em}
+[data-testid="stHeader"]{background:transparent}
+
+/* ---------- layout rhythm ---------- */
+.block-container{padding-top:1.4rem;padding-bottom:3rem;}
+hr{border:none;border-top:1px dashed var(--line);margin:1.05rem 0;}
+.stCaption, [data-testid="stCaptionContainer"]{opacity:.78}
+
+/* ---------- sidebar ---------- */
+[data-testid="stSidebar"]{background:#F2EDE2;border-right:1px solid var(--line);}
+
+/* ---------- buttons ---------- */
+.stButton>button{border-radius:10px;padding:.48rem 1.15rem;font-weight:600;
+    font-family:'Prompt','Sarabun',sans-serif;border:1px solid rgba(15,118,110,.35);
+    transition:transform .08s ease, box-shadow .12s ease;}
+.stButton>button[kind="secondary"]{background:#fff;color:#134E4A;}
+.stButton>button:hover{transform:translateY(-1px);}
+.stButton>button[kind="primary"]:hover{box-shadow:0 3px 10px rgba(15,118,110,.22);}
+
+/* ---------- inputs / selects ---------- */
+[data-baseweb="select"]>div,[data-baseweb="input"],input[type="text"],
+input[type="password"],textarea{border-radius:10px !important;}
+input:focus,[data-baseweb="select"]>div:focus-within{
+    border-color:var(--teal) !important;
+    box-shadow:0 0 0 3px rgba(15,118,110,.15) !important;}
+
+/* ---------- radio (โหมดทำแบบสอบถาม: หายใจได้ ไม่อึดอัด) ---------- */
+[data-testid="stRadio"] [role="radiogroup"]{gap:.55rem;padding:.15rem 0;}
+[data-testid="stRadio"] label{padding:.42rem .6rem;margin:0;border-radius:9px;
+    transition:background .1s ease;}
+[data-testid="stRadio"] label:hover{background:rgba(15,118,110,.07);}
+
+/* ---------- progress ---------- */
+[data-testid="stProgress"]{height:9px;border-radius:999px;
+    background:rgba(15,118,110,.14);overflow:hidden;}
+
+/* ---------- alerts / expanders ---------- */
+[data-testid="stAlert"]{border-radius:12px;border:1px solid var(--line);}
+[data-testid="stExpander"]{border:1px solid var(--line);border-radius:12px;
+    background:#fff;overflow:hidden;}
+[data-testid="stExpanderDetails"]{background:#fff;}
+
+/* ---------- welcome: ขั้นตอนแบบวงกลม ---------- */
+.steps{display:flex;flex-direction:column;gap:.7rem;margin:.4rem 0 1rem;}
+.step-row{display:flex;gap:.85rem;align-items:flex-start;}
+.step-num{flex:0 0 auto;width:34px;height:34px;border-radius:999px;
+    background:rgba(15,118,110,.12);color:var(--teal);display:flex;align-items:center;
+    justify-content:center;font-family:'Prompt';font-weight:700;
+    border:1.5px solid rgba(15,118,110,.4);}
+.step-body b{font-family:'Prompt','Sarabun',sans-serif;}
+.chip{display:inline-block;background:rgba(15,118,110,.10);
+    border:1px solid rgba(15,118,110,.25);color:#134E4A;border-radius:999px;
+    padding:.25rem .9rem;font-size:.85rem;font-weight:600;font-family:'Prompt';}
+
+/* ---------- sidebar stepper ---------- */
+.side-steps{display:flex;flex-direction:column;gap:.45rem;margin-bottom:.75rem;}
+.sstep{display:flex;align-items:center;gap:.6rem;font-size:.93rem;}
+.sstep.done{font-weight:600;}
+.dot{width:22px;height:22px;border-radius:999px;display:inline-flex;align-items:center;
+    justify-content:center;font-size:.72rem;font-weight:700;
+    border:1.5px solid rgba(15,118,110,.45);color:var(--teal);background:#fff;}
+.dot.done{background:var(--teal);color:#fff;border-color:var(--teal);}
+
+/* ---------- MBTI result panels ---------- */
+.mbti-panel{display:flex;gap:20px;align-items:flex-start;border-radius:14px;
+    padding:20px 26px;}
+.type-box{flex:0 0 auto;background:#fff;border-radius:12px;padding:10px 16px;}
+.type-code{font-family:'Prompt';font-size:2.2rem;font-weight:700;line-height:1.1;}
+.group-pill{display:inline-block;color:#fff;border-radius:999px;padding:3px 12px;
+    font-size:.8rem;font-weight:600;font-family:'Prompt';}
+.stack-card{border:1px solid;border-left-width:5px;border-radius:12px;
+    padding:13px 15px;height:100%;}
+.sc-role{font-size:.72rem;letter-spacing:.05em;opacity:.72;text-transform:uppercase;
+    font-family:'Prompt';}
+.sc-code{font-size:1.55rem;font-weight:700;font-family:'Prompt';margin:.2rem 0;}
+.sc-en{font-size:.88rem;font-weight:600;}
+.sc-th{font-size:.8rem;opacity:.72;margin-top:2px;}
+.sw-panel{border-radius:12px;padding:6px 18px 16px;border:1px solid;height:100%;}
+.sw-panel.strengths{background:#F0F7F1;border-color:rgba(5,150,105,.25);
+    border-left:5px solid #059669;}
+.sw-panel.grow{background:#FCF6EA;border-color:rgba(217,119,6,.28);
+    border-left:5px solid #D97706;}
+.sw-panel h4{margin:.55rem 0 .2rem;}
+.sw-panel ul{padding-left:1.1rem;margin:.35rem 0 0;}
+.sw-panel li{margin:.32rem 0;}
+
+/* ---------- results rank table (เน้นอันดับ 1-3) ---------- */
+.rank-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;
+    background:#fff;}
+table.rank-table{width:100%;border-collapse:collapse;font-size:.92rem;}
+.rank-table th{font-family:'Prompt';font-weight:600;text-align:left;
+    background:rgba(15,118,110,.10);padding:.6rem .75rem;white-space:nowrap;
+    color:#134E4A;border-bottom:2px solid rgba(15,118,110,.25);}
+.rank-table td{padding:.55rem .75rem;border-bottom:1px solid var(--line);
+    vertical-align:top;}
+.rank-table tbody tr:last-child td{border-bottom:none;}
+.rank-table tr:nth-child(even):not(.top){background:rgba(37,51,59,.03);}
+tr.rank1 td{background:rgba(233,196,106,.30);font-weight:600;}
+tr.rank2 td{background:rgba(160,168,178,.18);font-weight:600;}
+tr.rank3 td{background:rgba(180,121,74,.16);font-weight:600;}
+.badge{display:inline-flex;min-width:26px;height:26px;border-radius:999px;
+    align-items:center;justify-content:center;font-family:'Prompt';
+    font-weight:700;padding:0 4px;}
+.b1{background:#B8860B;color:#fff;}
+.b2{background:#8A94A6;color:#fff;}
+.b3{background:#B4794A;color:#fff;}
+.bn{background:#EEF2F0;color:#40514B;border:1px solid var(--line);}
+.matchbar{height:6px;border-radius:999px;background:rgba(15,118,110,.15);
+    min-width:90px;margin-top:4px;}
+.matchbar i{display:block;height:100%;border-radius:999px;background:var(--teal);}
+</style>
+"""
+
+
+def inject_css():
+    st.markdown(APP_CSS, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------- data loading
@@ -252,32 +387,40 @@ def delete_result(record_id, db_path=DB_PATH):
 
 
 # ---------------------------------------------------------------- chart helpers
+def _style_pie(fig, title, legend_size=11):
+    """จัดสไตล์ร่วมของ pie ทุกตัว: ฟอนต์/พื้นหลังโปร่ง/margin เดียวกันทั้งแอป"""
+    fig.update_traces(hole=0.45, marker_line_color="#FFFFFF",
+                      marker_line_width=2)
+    fig.update_layout(title_text=title, title_x=0.5,
+                      title_font={"family": "Prompt, sans-serif", "size": 16},
+                      legend_font={"family": "Sarabun, sans-serif",
+                                   "size": legend_size},
+                      paper_bgcolor="rgba(0,0,0,0)",
+                      margin=dict(t=52, b=10, l=10, r=10))
+    return fig
+
+
 def pie_functions(strengths):
     labels = [f"{f} — {FN_TH[f]}" for f in FN_ORDER]
     fig = px.pie(names=labels, values=[strengths[f] for f in FN_ORDER],
-                 hole=0.4, color_discrete_sequence=px.colors.qualitative.Set2)
-    fig.update_layout(title_text="สัดส่วนการใช้ Cognitive Functions ของคุณ",
-                      title_x=0.5, legend_font_size=11)
-    return fig
+                 color_discrete_sequence=PIE_COLORS)
+    return _style_pie(fig, "สัดส่วนการใช้ Cognitive Functions ของคุณ")
 
 
 def pie_categories(cat_scores):
     labels = [f"{c} — {CAT_TH[c]}" for c in CAT_ORDER]
     fig = px.pie(names=labels, values=[cat_scores[c] for c in CAT_ORDER],
-                 hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
-    fig.update_layout(title_text="ความชอบ 5 หมวด (M, S, L, H, A)", title_x=0.5,
-                      legend_font_size=11)
-    return fig
+                 color_discrete_sequence=PIE_COLORS)
+    return _style_pie(fig, "ความชอบ 5 หมวด (M, S, L, H, A)")
 
 
 def pie_top_faculties(rows):
     top = rows[:5]
     fig = px.pie(names=[f"{r['name']} ({r['match']}%)" for r in top],
-                 values=[r["match"] for r in top], hole=0.4,
-                 color_discrete_sequence=px.colors.qualitative.Bold)
-    fig.update_layout(title_text="5 คณะที่ Match % สูงสุด", title_x=0.5,
-                      legend_font_size=11)
-    return fig
+                 values=[r["match"] for r in top],
+                 color_discrete_sequence=PIE_COLORS)
+    fig.update_layout(legend_font_size=9)
+    return _style_pie(fig, "5 คณะที่ Match % สูงสุด")
 
 
 # ---------------------------------------------------------------- session state
@@ -341,17 +484,29 @@ def is_admin_password(password):
 def page_welcome():
     st.title("แบบสอบถามแนะแนวคณะ")
     st.markdown(
-        """
-        แอปนี้ช่วยให้คุณรู้จักตัวเองมากขึ้น แล้วจับคู่กับ **คณะ/สาขาที่เหมาะกับคุณ**
-        ผ่าน 3 ส่วนประกอบ:
-
-        1. **Cognitive Functions (MBTI)** — เลือก type ที่รู้แล้ว หรือทำแบบทดสอบ 80 ข้อ
-        2. **ความชอบ** — แบบสำรวจ 5 หมวด (100 ข้อ แบ่ง 5 หน้า)
-        3. **งบประมาณการศึกษา** — เพื่อแนะนำมหาวิทยาลัยที่เหมาะกับกำลังจ่าย
-
-        ใช้เวลารวมประมาณ 15–25 นาที ไม่มีคำตอบถูกหรือผิด ตอบตามความจริงใจของตัวเองได้เลย
-        """
+        "แอปนี้ช่วยให้คุณรู้จักตัวเองมากขึ้น "
+        "แล้วจับคู่กับ **คณะ/สาขาที่เหมาะกับคุณ** ผ่าน 3 ส่วนประกอบ:"
     )
+    st.markdown(
+        """
+        <div class="steps">
+          <div class="step-row"><div class="step-num">1</div>
+            <div class="step-body"><b>Cognitive Functions (MBTI)</b> —
+            เลือก type ที่รู้แล้ว หรือทำแบบทดสอบ 80 ข้อ</div></div>
+          <div class="step-row"><div class="step-num">2</div>
+            <div class="step-body"><b>ความชอบ</b> —
+            แบบสำรวจ 5 หมวด (100 ข้อ แบ่ง 5 หน้า)</div></div>
+          <div class="step-row"><div class="step-num">3</div>
+            <div class="step-body"><b>งบประมาณการศึกษา</b> —
+            เพื่อแนะนำมหาวิทยาลัยที่เหมาะกับกำลังจ่าย</div></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown('<span class="chip">⏱ ใช้เวลารวมประมาณ 15–25 นาที · '
+                "ไม่มีคำตอบถูกหรือผิด ตอบตามความจริงใจของตัวเองได้เลย</span>",
+                unsafe_allow_html=True)
+    st.markdown("")
     name = st.text_input("ชื่อ / ชื่อเล่น", value=st.session_state["name"])
     if st.button("เริ่ม", type="primary", disabled=(not name.strip())):
         st.session_state["name"] = name.strip()
@@ -546,9 +701,10 @@ def page_results():
                f"งบ: **{budget} ({tier_desc})**")
 
     # คณะที่ Match สูงสุด 3 อันดับ แสดงก่อนตาราง
+    medals = ["🥇", "🥈", "🥉"]
     for i, r in enumerate(rows[:3], start=1):
         fac = r["_fac"]
-        with st.expander(f"#{i} {r['name']} — Match {r['match']}%"):
+        with st.expander(f"{medals[i - 1]} #{i} {r['name']} — Match {r['match']}%"):
             st.write("**ฟังก์ชันที่ต้องการ:** "
                      + ", ".join(fac["functions"]) + f" (scope: {fac['scope']})")
             st.write("**เงื่อนไขความชอบ:** "
@@ -559,13 +715,7 @@ def page_results():
                 st.write(f"- **{k} ({t['label']})**: {b}")
 
     st.subheader("คณะแนะนำ 10 อันดับแรก")
-    table = pd.DataFrame([
-        {"อันดับ": i + 1, "คณะ/สาขา": r["name"], "Match %": r["match"],
-         "MBTI Score": r["mbtiScore"], "Subj Score": r["subjScore"],
-         "เหตุผล": r["reason"], f"ตัวอย่างมหาวิทยาลัย ({budget})": r["uni"]}
-        for i, r in enumerate(rows[:10])
-    ])
-    st.table(table)
+    render_rank_table(rows, budget)
 
     st.divider()
     st.subheader("บันทึกผลลัพธ์")
@@ -607,6 +757,37 @@ def name_suffix():
     return f" {n}" if n else ""
 
 
+def render_rank_table(rows, budget):
+    """ตารางแนะนำ 10 อันดับ — เน้นแถวอันดับ 1-3 ให้เด่นกว่าอันดับที่เหลือ"""
+    head_cols = ["อันดับ", "คณะ/สาขา", "Match %", "MBTI Score", "Subj Score",
+                 "เหตุผล", f"ตัวอย่างมหาวิทยาลัย ({budget})"]
+    head = "".join(f"<th>{c}</th>" for c in head_cols)
+    body = []
+    for i, r in enumerate(rows[:10]):
+        cls = ("rank1 top" if i == 0 else "rank2 top" if i == 1
+               else "rank3 top" if i == 2 else "")
+        badge_cls = f"b{i + 1}" if i < 3 else "bn"
+        pct = min(max(r["match"], 0), 100)
+        cells = [
+            f'<td><span class="badge {badge_cls}">{i + 1}</span></td>',
+            f'<td><b>{html.escape(r["name"])}</b></td>',
+            '<td style="min-width:110px">'
+            f'<div style="font-weight:700">{r["match"]}%</div>'
+            f'<div class="matchbar"><i style="width:{pct}%"></i></div></td>',
+            f'<td>{r["mbtiScore"]}</td>',
+            f'<td>{r["subjScore"]}</td>',
+            f'<td style="max-width:280px">{html.escape(r["reason"])}</td>',
+            f'<td>{html.escape(str(r["uni"]))}</td>',
+        ]
+        body.append(f'<tr class="{cls}">' + "".join(cells) + "</tr>")
+    st.markdown(
+        '<div class="rank-table-wrap"><table class="rank-table">'
+        f"<thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody>"
+        "</table></div>",
+        unsafe_allow_html=True,
+    )
+
+
 def parse_top_faculties(text):
     """Parse '1. ชื่อคณะ (xx.x%) | 2. ...' จากคอลัมน์ top_faculties -> [(name, match)]"""
     out = []
@@ -635,23 +816,21 @@ def render_history():
             fac_counts[tops[0][0]] = fac_counts.get(tops[0][0], 0) + 1
 
     fig_m = px.pie(names=list(mbti_counts.index), values=mbti_counts.values,
-                   hole=0.4, color_discrete_sequence=px.colors.qualitative.Set2)
-    fig_m.update_layout(title_text="สรุปผล MBTI ทั้งหมด", title_x=0.5,
-                        legend_font_size=11)
+                   color_discrete_sequence=PIE_COLORS)
+    _style_pie(fig_m, "สรุปผล MBTI ทั้งหมด")
 
     if not fac_counts:
-        st.plotly_chart(fig_m)
+        st.plotly_chart(fig_m, use_container_width=True)
     else:
         fig_f = px.pie(names=list(fac_counts.keys()),
-                       values=list(fac_counts.values()), hole=0.4,
-                       color_discrete_sequence=px.colors.qualitative.Bold)
-        fig_f.update_layout(title_text="สรุปคณะที่ได้ทั้งหมด",
-                            title_x=0.5, legend_font_size=9)
+                       values=list(fac_counts.values()),
+                       color_discrete_sequence=PIE_COLORS)
+        _style_pie(fig_f, "สรุปคณะที่ได้ทั้งหมด", legend_size=9)
         c1, c2 = st.columns(2)
         with c1:
-            st.plotly_chart(fig_m)
+            st.plotly_chart(fig_m, use_container_width=True)
         with c2:
-            st.plotly_chart(fig_f)
+            st.plotly_chart(fig_f, use_container_width=True)
 
     # ตารางภาพรวมทุกเรคคอร์ด
     overview = []
@@ -665,7 +844,8 @@ def render_history():
             "คณะอันดับ 1": tops[0][0] if tops else "-",
             "งบที่เลือก": r["budget"],
         })
-    st.dataframe(pd.DataFrame(overview).drop(columns="_id"))
+    st.dataframe(pd.DataFrame(overview).drop(columns="_id"),
+                 hide_index=True, use_container_width=True)
 
     # ลบรายการที่เลือก (map label -> id เพื่อไม่แยกด้วย split)
     label_by_id = {f"#{o['_id']} {o['ชื่อ']} — {o['วันเวลา']}": o["_id"]
@@ -680,7 +860,8 @@ def render_history():
 
 # ---------------------------------------------------------------- main
 def main():
-    st.set_page_config(page_title="แนะแนวคณะ", layout="wide")
+    st.set_page_config(page_title="แนะแนวคณะ", page_icon="🎓", layout="wide")
+    inject_css()
     init_session()
 
     fn_questions = parse_function_questions()
@@ -695,8 +876,18 @@ def main():
             ("4. งบประมาณ", st.session_state["budget_tier"] is not None),
             ("5. ผลลัพธ์", st.session_state["step"] == "results"),
         ]
-        for label, ok in done_flags:
-            st.write(("✔ " if ok else "○ ") + label)
+        rows = "".join(
+            '<div class="sstep{cls}"><span class="dot{dcls}">{mark}</span>'
+            "{label}</div>".format(
+                cls=" done" if ok else "",
+                dcls=" done" if ok else "",
+                mark="✓" if ok else i + 1,
+                label=label,
+            )
+            for i, (label, ok) in enumerate(done_flags)
+        )
+        st.markdown(f'<div class="side-steps">{rows}</div>',
+                    unsafe_allow_html=True)
         if st.session_state["name"]:
             st.write(f"ผู้ใช้: **{st.session_state['name']}**")
         if st.session_state["admin_authenticated"]:
