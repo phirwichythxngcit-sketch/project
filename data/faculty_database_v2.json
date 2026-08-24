@@ -38,7 +38,7 @@
       "budget":{"B1":"ราชมงคล, แม่โจ้ ~8-15K","B2":"เกษตรศาสตร์ (บางเขน) ~15-20K","B3":"เกษตรฯ อินเตอร์, ABAC ~50-80K"}},
     {"name":"ประมง (Fisheries)","group":"STEM","functions":["Si","Ni"],"scope":"Dominant","conditions":[{"cat":"S","min":55}],
       "budget":{"B1":"ราชมงคล ~10-18K","B2":"เกษตรศาสตร์ (บางเขน) ~15-22K","B3":"หลักสูตรอินเตอร์ (มีน้อย) ~40-70K"}},
-    {"name":"สถาปัตยกรรมศาสตร์","group":"STEM","functions":["Ni","Ti"],"scope":"Mixed","note":"Ni ต้องเป็น Dominant หรือ Ti อยู่ใน D/A","conditions":[{"cat":"A","min":55},{"cat":"M","min":40}],
+    {"name":"สถาปัตยกรรมศาสตร์","group":"STEM","functions":["Ni","Ti"],"scope":"Mixed","functionScopes":{"Dominant":["Ni"],"D/A":["Ti"]},"note":"Ni ต้องเป็น Dominant หรือ Ti อยู่ใน D/A","conditions":[{"cat":"A","min":55},{"cat":"M","min":40}],
       "budget":{"B1":"ราชมงคล ~15-20K","B2":"ศิลปากร/เกษตรฯ ~19-30K","B3":"INDA จุฬา, สจล. อินเตอร์ ~90-150K+"}},
 
     {"name":"แพทยศาสตร์","group":"Health","functions":["Te","Ni"],"scope":"D/A","conditions":[{"cat":"S","min":60},{"cat":"H","min":35}],

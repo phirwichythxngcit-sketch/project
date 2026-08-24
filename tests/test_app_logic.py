@@ -1,0 +1,69 @@
+import importlib.util
+import sys
+import types
+import unittest
+from pathlib import Path
+
+
+def load_app():
+    streamlit = types.ModuleType("streamlit")
+    streamlit.cache_data = lambda **_kwargs: lambda func: func
+    streamlit.session_state = {}
+    sys.modules["streamlit"] = streamlit
+    sys.modules.setdefault("pandas", types.ModuleType("pandas"))
+    plotly = types.ModuleType("plotly")
+    plotly_express = types.ModuleType("plotly.express")
+    sys.modules.setdefault("plotly", plotly)
+    sys.modules.setdefault("plotly.express", plotly_express)
+
+    path = Path(__file__).resolve().parents[1] / "app.py"
+    spec = importlib.util.spec_from_file_location("app_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+app = load_app()
+
+
+class SurveyNavigationTests(unittest.TestCase):
+    def test_saved_list_answers_are_available_after_back_navigation(self):
+        answers = [5, 4, 3]
+        self.assertEqual(app.saved_answer_at(answers, 1), 4)
+        self.assertIsNone(app.saved_answer_at(answers, 3))
+
+
+class MixedScopeTests(unittest.TestCase):
+    def setUp(self):
+        self.architecture = next(
+            faculty for faculty in app.FACULTIES
+            if faculty["name"] == "สถาปัตยกรรมศาสตร์"
+        )
+
+    def test_non_dominant_ni_does_not_satisfy_dominant_route(self):
+        strengths = {"Ti": 0, "Te": 0, "Fe": 0, "Fi": 0,
+                     "Se": 0, "Si": 0, "Ne": 100, "Ni": 70}
+        self.assertEqual(app.mbti_score(self.architecture, strengths), 0)
+
+    def test_da_route_remains_available_for_ti(self):
+        strengths = {"Ti": 80, "Te": 0, "Fe": 0, "Fi": 0,
+                     "Se": 0, "Si": 0, "Ne": 100, "Ni": 70}
+        self.assertEqual(app.mbti_score(self.architecture, strengths), 80)
+
+
+class StackSimilarityTests(unittest.TestCase):
+    def test_exact_stack_is_100_percent(self):
+        self.assertEqual(app.stack_similarity(
+            ["Ti", "Ne", "Si", "Fe"], ["Ti", "Ne", "Si", "Fe"]), 1.0)
+
+    def test_only_first_position_match_is_40_percent(self):
+        self.assertEqual(app.stack_similarity(
+            ["Ti", "Te", "Fe", "Fi"], ["Ti", "Ne", "Si", "Fe"]), 0.4)
+
+    def test_no_position_matches_is_zero_percent(self):
+        self.assertEqual(app.stack_similarity(
+            ["Te", "Fe", "Fi", "Se"], ["Ti", "Ne", "Si", "Fe"]), 0.0)
+
+
+if __name__ == "__main__":
+    unittest.main()
