@@ -17,6 +17,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from mbti_result import display_mbti_result
+
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = BASE_DIR / "results.db"
@@ -448,12 +450,10 @@ def page_mbti_summary():
         st.success(f"จากแบบทดสอบ ประเภทที่ใกล้เคียงที่สุดของคุณคือ "
                    f"**{code} — {info['title']}** (ความเข้ากันได้ ~{sim}%)")
 
-    st.markdown(info["desc"])
+    # หน้าแสดงผลลัพธ์ MBTI แบบละเอียด (nickname, function stack, tabs)
+    display_mbti_result(code)
 
     strengths = st.session_state["function_strengths"]
-    top4 = sorted(FN_ORDER, key=lambda f: strengths[f], reverse=True)[:4]
-    st.info("Function Stack ของคุณ: "
-            + " → ".join(f"{f} ({strengths[f]:.0f}%)" for f in top4))
 
     st.plotly_chart(pie_functions(strengths))
 
