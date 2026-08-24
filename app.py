@@ -317,9 +317,17 @@ def saved_answer_at(answers, index):
     return None
 
 
+def admin_password():
+    """Return the configured Streamlit Secrets password, if one exists."""
+    try:
+        return st.secrets.get("ADMIN_PASSWORD")
+    except FileNotFoundError:
+        return None
+
+
 def is_admin_password(password):
     """Check an administrator password stored only in Streamlit Secrets."""
-    expected = st.secrets.get("ADMIN_PASSWORD")
+    expected = admin_password()
     return bool(expected) and hmac.compare_digest(password, expected)
 
 
@@ -806,7 +814,7 @@ def main():
                 st.session_state["admin_authenticated"] = False
                 st.session_state["show_history"] = False
                 st.rerun()
-        elif st.secrets.get("ADMIN_PASSWORD"):
+        elif admin_password():
             with st.expander("สำหรับผู้ดูแล"):
                 password = st.text_input("รหัสผ่านผู้ดูแล", type="password")
                 if st.button("เข้าสู่ระบบผู้ดูแล"):
