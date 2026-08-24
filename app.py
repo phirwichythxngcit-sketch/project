@@ -354,7 +354,7 @@ def page_welcome():
 
 
 def page_mbti_choice():
-    st.header("ผล MBTI ของคุณมาจากไหน?")
+    st.header("คุณรู้ผล MBTI ของคุณหรือไม่?")
     choice = st.radio(
         "เลือกทางเลือกที่ตรงกับคุณ:",
         options=["ฉันรู้ผล MBTI ของตัวเองอยู่แล้ว (จะเลือกเอง)",
