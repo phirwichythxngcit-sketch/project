@@ -540,23 +540,7 @@ def page_results():
     st.success(f"MBTI: **{st.session_state['derived_type']}** · "
                f"งบ: **{budget} ({tier_desc})**")
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.plotly_chart(pie_functions(strengths))
-    with col2:
-        st.plotly_chart(pie_categories(cat_scores))
-    with col3:
-        st.plotly_chart(pie_top_faculties(rows))
-
-    st.subheader("คณะแนะนำ 10 อันดับแรก")
-    table = pd.DataFrame([
-        {"อันดับ": i + 1, "คณะ/สาขา": r["name"], "Match %": r["match"],
-         "MBTI Score": r["mbtiScore"], "Subj Score": r["subjScore"],
-         "เหตุผล": r["reason"], f"ตัวอย่างมหาวิทยาลัย ({budget})": r["uni"]}
-        for i, r in enumerate(rows[:10])
-    ])
-    st.table(table)
-
+    # คณะที่ Match สูงสุด 3 อันดับ แสดงก่อนตาราง
     for i, r in enumerate(rows[:3], start=1):
         fac = r["_fac"]
         with st.expander(f"#{i} {r['name']} — Match {r['match']}%"):
@@ -568,6 +552,15 @@ def page_results():
                 b = fac["budget"].get(k, "-")
                 t = BUDGET_TIERS[k]
                 st.write(f"- **{k} ({t['label']})**: {b}")
+
+    st.subheader("คณะแนะนำ 10 อันดับแรก")
+    table = pd.DataFrame([
+        {"อันดับ": i + 1, "คณะ/สาขา": r["name"], "Match %": r["match"],
+         "MBTI Score": r["mbtiScore"], "Subj Score": r["subjScore"],
+         "เหตุผล": r["reason"], f"ตัวอย่างมหาวิทยาลัย ({budget})": r["uni"]}
+        for i, r in enumerate(rows[:10])
+    ])
+    st.table(table)
 
     st.divider()
     st.subheader("บันทึกผลลัพธ์")
