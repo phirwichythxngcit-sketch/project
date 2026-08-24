@@ -186,23 +186,6 @@ def inject_css():
     st.markdown(APP_CSS, unsafe_allow_html=True)
 
 
-# สเกลคะแนน 1-5: ไล่ขนาดตัวอักษรจากเล็กไปใหญ่ (ใช้เฉพาะหน้าทำแบบประเมิน)
-RATING_SCALE_CSS = """
-<style>
-[data-testid="stRadio"] div[role="radiogroup"] label:nth-child(1){font-size:.82em;}
-[data-testid="stRadio"] div[role="radiogroup"] label:nth-child(2){font-size:.90em;}
-[data-testid="stRadio"] div[role="radiogroup"] label:nth-child(3){font-size:1.00em;}
-[data-testid="stRadio"] div[role="radiogroup"] label:nth-child(4){font-size:1.12em;}
-[data-testid="stRadio"] div[role="radiogroup"] label:nth-child(5){
-    font-size:1.26em;font-weight:600;}
-</style>
-"""
-
-
-def inject_rating_scale_css():
-    st.markdown(RATING_SCALE_CSS, unsafe_allow_html=True)
-
-
 # ---------------------------------------------------------------- data loading
 @st.cache_data(show_spinner=False)
 def load_json(name):
@@ -572,7 +555,6 @@ def page_mbti_select():
 
 
 def page_function_test(fn_questions):
-    inject_rating_scale_css()
     idx = st.session_state["fn_index"]
     func = FN_ORDER[idx]
     done = len(st.session_state["func_raw"])
@@ -648,7 +630,6 @@ def page_mbti_summary():
 
 
 def page_interest_survey(survey):
-    inject_rating_scale_css()
     idx = st.session_state["interest_index"]
     cat = CAT_ORDER[idx]
     block = survey[cat]
