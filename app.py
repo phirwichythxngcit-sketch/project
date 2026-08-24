@@ -265,7 +265,7 @@ def pie_categories(cat_scores):
     labels = [f"{c} — {CAT_TH[c]}" for c in CAT_ORDER]
     fig = px.pie(names=labels, values=[cat_scores[c] for c in CAT_ORDER],
                  hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
-    fig.update_layout(title_text="ความถนัด 5 หมวด (M, S, L, H, A)", title_x=0.5,
+    fig.update_layout(title_text="ความชอบ 5 หมวด (M, S, L, H, A)", title_x=0.5,
                       legend_font_size=11)
     return fig
 
@@ -343,10 +343,10 @@ def page_welcome():
     st.markdown(
         """
         แอปนี้ช่วยให้คุณรู้จักตัวเองมากขึ้น แล้วจับคู่กับ **คณะ/สาขาที่เหมาะกับคุณ**
-        ผ่าน 3 ชิ้นประกอบ:
+        ผ่าน 3 ส่วนประกอบ:
 
         1. **Cognitive Functions (MBTI)** — เลือก type ที่รู้แล้ว หรือทำแบบทดสอบ 80 ข้อ
-        2. **ความสนใจและความถนัด** — แบบสำรวจ 5 หมวด (100 ข้อ แบ่ง 5 หน้า)
+        2. **ความชอบ** — แบบสำรวจ 5 หมวด (100 ข้อ แบ่ง 5 หน้า)
         3. **งบประมาณการศึกษา** — เพื่อแนะนำมหาวิทยาลัยที่เหมาะกับกำลังจ่าย
 
         ใช้เวลารวมประมาณ 15–25 นาที ไม่มีคำตอบถูกหรือผิด ตอบตามความจริงใจของตัวเองได้เลย
@@ -469,7 +469,7 @@ def page_mbti_summary():
             st.session_state["func_raw"] = {}
             goto("mbti_choice")
     with c2:
-        if st.button("ทำแบบสำรวจความถนัดต่อ →", type="primary"):
+        if st.button("ทำแบบสำรวจความชอบต่อ →", type="primary"):
             st.session_state["interest_index"] = 0
             goto("interest_survey")
 
@@ -551,7 +551,7 @@ def page_results():
         with st.expander(f"#{i} {r['name']} — Match {r['match']}%"):
             st.write("**ฟังก์ชันที่ต้องการ:** "
                      + ", ".join(fac["functions"]) + f" (scope: {fac['scope']})")
-            st.write("**เงื่อนไขความถนัด:** "
+            st.write("**เงื่อนไขความชอบ:** "
                      + "; ".join(f"{c['cat']} ≥ {c['min']}" for c in fac["conditions"]))
             for k in tier_keys_all():
                 b = fac["budget"].get(k, "-")
@@ -691,7 +691,7 @@ def main():
         done_flags = [
             ("1. เริ่มต้น", bool(st.session_state["name"])),
             ("2. ผล MBTI", st.session_state["function_strengths"] is not None),
-            ("3. ความถนัด", st.session_state["cat_scores"] is not None),
+            ("3. ความชอบ", st.session_state["cat_scores"] is not None),
             ("4. งบประมาณ", st.session_state["budget_tier"] is not None),
             ("5. ผลลัพธ์", st.session_state["step"] == "results"),
         ]
