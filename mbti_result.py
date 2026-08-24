@@ -38,7 +38,8 @@ def _render_header(t: str, info: dict, group: dict, color: str) -> None:
     )
     # ชื่อ type + nickname
     st.header(f"{t} — {info['nickname']}")
-    st.caption(info["description"])
+    # คำอธิบาย แสดงเป็นตัวหนาเพื่อให้อ่านชัดขึ้น
+    st.markdown(f"**{info['description']}**")
 
 
 def _render_stack(t: str, color: str) -> None:
