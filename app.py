@@ -630,31 +630,7 @@ def render_history():
         st.warning(EPHEMERAL_WARNING)
         return
 
-    # ตารางภาพรวมทุกเรคคอร์ด
-    overview = []
-    for _, r in df.iterrows():
-        tops = parse_top_faculties(r["top_faculties"])
-        overview.append({
-            "_id": r["id"],
-            "ชื่อ": r["name"],
-            "วันเวลา": r["timestamp"],
-            "MBTI ที่ได้": r["mbti_type"],
-            "คณะอันดับ 1": tops[0][0] if tops else "-",
-            "งบที่เลือก": r["budget"],
-        })
-    st.dataframe(pd.DataFrame(overview).drop(columns="_id"))
-
-    # ลบรายการที่เลือก (map label -> id เพื่อไม่แยกด้วย split)
-    label_by_id = {f"#{o['_id']} {o['ชื่อ']} — {o['วันเวลา']}": o["_id"]
-                   for o in overview}
-    to_delete = st.multiselect("เลือกรายการที่ต้องการลบ", list(label_by_id.keys()))
-    if to_delete and st.button("ลบรายการที่เลือก", type="primary"):
-        for lab in to_delete:
-            delete_result(label_by_id[lab])
-        st.success(f"ลบแล้ว {len(to_delete)} รายการ")
-        st.rerun()
-
-    # สรุปข้อมูลจากทุกเรคคอร์ด เป็นแผนภูมิวงกลม 2 อัน
+    # สรุปข้อมูลจากทุกเรคคอร์ด เป็นแผนภูมิวงกลม 2 อัน (แสดงก่อนตาราง)
     mbti_counts = df["mbti_type"].value_counts()
     fac_counts = {}
     for _, r in df.iterrows():
@@ -680,6 +656,30 @@ def render_history():
             st.plotly_chart(fig_m)
         with c2:
             st.plotly_chart(fig_f)
+
+    # ตารางภาพรวมทุกเรคคอร์ด
+    overview = []
+    for _, r in df.iterrows():
+        tops = parse_top_faculties(r["top_faculties"])
+        overview.append({
+            "_id": r["id"],
+            "ชื่อ": r["name"],
+            "วันเวลา": r["timestamp"],
+            "MBTI ที่ได้": r["mbti_type"],
+            "คณะอันดับ 1": tops[0][0] if tops else "-",
+            "งบที่เลือก": r["budget"],
+        })
+    st.dataframe(pd.DataFrame(overview).drop(columns="_id"))
+
+    # ลบรายการที่เลือก (map label -> id เพื่อไม่แยกด้วย split)
+    label_by_id = {f"#{o['_id']} {o['ชื่อ']} — {o['วันเวลา']}": o["_id"]
+                   for o in overview}
+    to_delete = st.multiselect("เลือกรายการที่ต้องการลบ", list(label_by_id.keys()))
+    if to_delete and st.button("ลบรายการที่เลือก", type="primary"):
+        for lab in to_delete:
+            delete_result(label_by_id[lab])
+        st.success(f"ลบแล้ว {len(to_delete)} รายการ")
+        st.rerun()
 
     st.warning(EPHEMERAL_WARNING)
 
