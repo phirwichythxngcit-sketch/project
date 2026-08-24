@@ -246,6 +246,14 @@ def load_history(db_path=DB_PATH):
     return df
 
 
+def delete_result(record_id, db_path=DB_PATH):
+    """ลบเรคคอร์ดตาม id (ไม่แก้ schema)"""
+    conn = init_db(db_path)
+    conn.execute("DELETE FROM results WHERE id = ?", (int(record_id),))
+    conn.commit()
+    conn.close()
+
+
 # ---------------------------------------------------------------- chart helpers
 def pie_functions(strengths):
     labels = [f"{f} — {FN_TH[f]}" for f in FN_ORDER]
@@ -622,6 +630,7 @@ def render_history():
         st.warning(EPHEMERAL_WARNING)
         return
 
+    # ตารางภาพรวมทุกเรคคอร์ด
     overview = []
     for _, r in df.iterrows():
         tops = parse_top_faculties(r["top_faculties"])
@@ -635,38 +644,42 @@ def render_history():
         })
     st.dataframe(pd.DataFrame(overview).drop(columns="_id"))
 
-    labels = [f"{o['ชื่อ']} — {o['วันเวลา']}" for o in overview]
-    sel = st.selectbox("เลือกดูรายละเอียดรายบุคคล (แผนภูมิ 3 แผนภูมิ)", labels)
-    if sel is None:
-        return
-    rec = df.iloc[labels.index(sel)]
+    # ลบรายการที่เลือก (map label -> id เพื่อไม่แยกด้วย split)
+    label_by_id = {f"#{o['_id']} {o['ชื่อ']} — {o['วันเวลา']}": o["_id"]
+                   for o in overview}
+    to_delete = st.multiselect("เลือกรายการที่ต้องการลบ", list(label_by_id.keys()))
+    if to_delete and st.button("ลบรายการที่เลือก", type="primary"):
+        for lab in to_delete:
+            delete_result(label_by_id[lab])
+        st.success(f"ลบแล้ว {len(to_delete)} รายการ")
+        st.rerun()
 
-    tops = parse_top_faculties(rec["top_faculties"])
-    func_scores = {f: float(rec[f]) for f in FN_ORDER}
-    cat_scores = {c: int(rec[c]) for c in CAT_ORDER}
-    top1_name = tops[0][0] if tops else "-"
-
-    st.markdown(f"**{rec['name']}** · MBTI ใกล้เคียงที่สุด: "
-                f"**{rec['mbti_type']}** · คณะอันดับ 1: **{top1_name}**")
-
-    fig1 = pie_functions(func_scores)
-    fig1.update_layout(title_text="สัดส่วนการใช้ Cognitive Functions")
-    fig2 = pie_categories(cat_scores)
-    fig2.update_layout(title_text="สัดส่วนความถนัด 5 หมวดวิชา")
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.plotly_chart(fig1)
-    with c2:
-        st.plotly_chart(fig2)
-    with c3:
+    # สรุปข้อมูลจากทุกเรคคอร์ด เป็นแผนภูมิวงกลม 2 อัน
+    mbti_counts = df["mbti_type"].value_counts()
+    fac_counts = {}
+    for _, r in df.iterrows():
+        tops = parse_top_faculties(r["top_faculties"])
         if tops:
-            fig3 = pie_top_faculties([{"name": n, "match": v} for n, v in tops])
-            fig3.update_layout(title_text="คณะที่เหมาะกับคุณ",
-                               legend_font_size=9)
-            st.plotly_chart(fig3)
-        else:
-            st.info("ไม่มีข้อมูลคณะที่บันทึกไว้ในแถวนี้")
+            fac_counts[tops[0][0]] = fac_counts.get(tops[0][0], 0) + 1
+
+    fig_m = px.pie(names=list(mbti_counts.index), values=mbti_counts.values,
+                   hole=0.4, color_discrete_sequence=px.colors.qualitative.Set2)
+    fig_m.update_layout(title_text="สรุปผล MBTI ทั้งหมด", title_x=0.5,
+                        legend_font_size=11)
+
+    if not fac_counts:
+        st.plotly_chart(fig_m)
+    else:
+        fig_f = px.pie(names=list(fac_counts.keys()),
+                       values=list(fac_counts.values()), hole=0.4,
+                       color_discrete_sequence=px.colors.qualitative.Bold)
+        fig_f.update_layout(title_text="สรุปคณะที่ได้ทั้งหมด",
+                            title_x=0.5, legend_font_size=9)
+        c1, c2 = st.columns(2)
+        with c1:
+            st.plotly_chart(fig_m)
+        with c2:
+            st.plotly_chart(fig_f)
 
     st.warning(EPHEMERAL_WARNING)
 
