@@ -49,9 +49,6 @@ SCALE_1_5 = ["1 — ไม่เห็นด้วยอย่างยิ่ง
              "4 — เห็นด้วย", "5 — เห็นด้วยอย่างยิ่ง"]
 DISCLAIMER = ("นี่คือผลโดยประมาณเพื่อการสำรวจตนเอง "
               "ไม่ใช่ผลวินิจฉัยที่ตายตัว")
-EPHEMERAL_WARNING = (
-    "**คำเตือน:** ถ้า deploy บน Streamlit Cloud ข้อมูลใน results.db จะหายเมื่อแอปถูก redeploy "
-    "(ephemeral storage) หากต้องการเก็บประวัติถาวร แนะนำให้ใช้ Google Sheets หรือฐานข้อมูลภายนอกแทน")
 
 
 # ---------------------------------------------------------------- data loading
@@ -627,7 +624,6 @@ def render_history():
     st.subheader("ประวัติผลลัพธ์ที่บันทึกไว้ (results.db)")
     if df.empty:
         st.info("ยังไม่มีข้อมูลที่บันทึกไว้")
-        st.warning(EPHEMERAL_WARNING)
         return
 
     # สรุปข้อมูลจากทุกเรคคอร์ด เป็นแผนภูมิวงกลม 2 อัน (แสดงก่อนตาราง)
@@ -680,8 +676,6 @@ def render_history():
             delete_result(label_by_id[lab])
         st.success(f"ลบแล้ว {len(to_delete)} รายการ")
         st.rerun()
-
-    st.warning(EPHEMERAL_WARNING)
 
 
 # ---------------------------------------------------------------- main
