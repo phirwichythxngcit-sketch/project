@@ -291,7 +291,6 @@ def init_session():
         "budget_tier": None,
         "saved_id": None,
         "show_history": False,
-        "show_calc": False,
         "admin_authenticated": False,
     }
     for k, v in defaults.items():
@@ -684,108 +683,6 @@ def render_history():
     st.warning(EPHEMERAL_WARNING)
 
 
-# ---------------------------------------------------------------- calc explainer
-DEMO_STRENGTHS = {"Ti": 65.0, "Te": 40.0, "Fe": 20.0, "Fi": 30.0,
-                  "Se": 15.0, "Si": 25.0, "Ne": 45.0, "Ni": 55.0}
-DEMO_CATS = {"M": 70, "S": 50, "L": 35, "H": 45, "A": 30}
-
-
-def bool_condition_str(fac):
-    fn_clause = " ∨ ".join(f"{f}∈D/A" for f in fac["functions"])
-    cond_clause = " ∧ ".join(f"{c['cat']} ≥ {c['min']}%" for c in fac["conditions"])
-    return " ∧ ".join([f"( {fn_clause} )", cond_clause])
-
-
-def render_calc_explanation():
-    st.divider()
-    st.header("วิธีคำนวณ Match %")
-
-    # ---------- ส่วนที่ 1: ทฤษฎี ----------
-    st.subheader("ส่วนที่ 1 · ทฤษฎี: จาก Boolean สู่ Fuzzy")
-    st.markdown(
-        "เงื่อนไขรับเข้าของแต่ละคณะถูกเขียนครั้งแรกเป็น **ตรรกศาสตร์เชิงประพจน์แบบ Boolean** "
-        "(แต่ละเงื่อนไข \"ผ่าน/ไม่ผ่าน\" = 1/0) จากนั้นระบบจึงแปลงเป็น **Fuzzy Logic** "
-        "เพื่อให้ได้ % ความเข้ากันได้แบบ **ต่อเนื่อง 0–100** แทนที่จะเหลือแค่สองค่า"
-    )
-    st.markdown(
-        """
-| ตัวเชื่อม Boolean | สูตร Fuzzy | เหตุผล |
-|---|---|---|
-| A ∧ B (AND) | `min(A, B)` | AND แข็งแรงเท่ากับจุดอ่อนที่สุดในกลุ่ม |
-| A ∨ B (OR) | `max(A, B)` | OR แค่ต้องมีตัวที่ดีที่สุดในกลุ่มพอ |
-"""
-    )
-    st.latex(r"A \wedge B \;\longrightarrow\; \min(A,\ B)"
-             r"\qquad A \vee B \;\longrightarrow\; \max(A,\ B)")
-
-    # ---------- ส่วนที่ 2: สาธิตด้วยค่าจริง ----------
-    st.subheader("ส่วนที่ 2 · สาธิต step-by-step ด้วยค่าของคุณ")
-    strengths = st.session_state.get("function_strengths")
-    cats = st.session_state.get("cat_scores")
-    if strengths and cats:
-        top = rank_faculties(strengths, cats)[0]
-        fac = top["_fac"]
-        st.success(f"ใช้ค่าจริงของคุณ — คณะที่ Match % สูงสุด: "
-                   f"**{top['name']} ({top['match']}%)**")
-    else:
-        strengths, cats = DEMO_STRENGTHS, DEMO_CATS
-        fac = next(f for f in FACULTIES if f["name"] == "วิทยาการคอมพิวเตอร์/IT")
-        st.warning("ยังไม่มีผลทดสอบในเซสชันนี้ — ใช้ **ตัวเลขตัวอย่าง** แทน "
-                   "(Ti 65%, Te 40%, M 70, S 50)")
-
-    scope = fac.get("scope", "D/A")
-
-    st.markdown("**ขั้นที่ 1 — เขียนเงื่อนไข Boolean ดั้งเดิมของคณะ**")
-    st.code(bool_condition_str(fac), language=None)
-    if scope == "Dominant":
-        st.caption("โน้ต: scope = Dominant → ฟังก์ชันสูงสุดของผู้ใช้ต้องอยู่ในลิสต์ของคณะ "
-                   "ไม่เช่นนั้นคะแนน × 0.5")
-    elif scope == "Mixed":
-        st.caption("โน้ต: scope = Mixed → เอาค่ามากกว่าระหว่างวิธี D/A (max) กับวิธี Dominant")
-
-    st.markdown("**ขั้นที่ 2 — แทนค่าจริงของคุณลงในตัวแปร**")
-    lines = [f"{f} ของคุณ = {strengths[f]:g}%" for f in fac["functions"]]
-    lines += [f"{c['cat']} ของคุณ = {int(cats[c['cat']])} (เกณฑ์ ≥ {c['min']})"
-              for c in fac["conditions"]]
-    st.code("\n".join(lines), language=None)
-
-    st.markdown("**ขั้นที่ 3 — mbtiScore: ฝั่งฟังก์ชัน (OR → max)**")
-    ms = round(mbti_score(fac, strengths), 1)
-    vals = ",\\ ".join(f"{strengths[f]:g}" for f in fac["functions"])
-    st.latex(r"\text{mbtiScore} = \max(\," + vals + r"\,) = " + f"{ms:g}")
-    st.caption("ใช้ max เพราะเงื่อนไขฟังก์ชันเป็น OR (∨): "
-               + " หรือ ".join(fac["functions"])
-               + " — ตัวใดตัวหนึ่งแข็งแรงก็เพียงพอ")
-    if scope != "D/A":
-        dom_f = max(FN_ORDER, key=lambda f: strengths[f])
-        factor = 1.0 if dom_f in fac["functions"] else 0.5
-        pos = "อยู่" if dom_f in fac["functions"] else "ไม่อยู่"
-        st.caption(f"[scope {scope}] ฟังก์ชันสูงสุดของคุณคือ {dom_f} → {pos}ในลิสต์ของคณะ "
-                   f"⇒ คูณ {factor:g}")
-
-    st.markdown("**ขั้นที่ 4 — subjScore: ฝั่งความถนัด (AND → min)**")
-    ss = round(subj_score(fac, cats), 1)
-    argstr = ",\\ ".join(f"{int(cats[c['cat']])}/{c['min']}\\times 100"
-                         for c in fac["conditions"])
-    st.latex(r"\text{subjScore} = \min(\," + argstr + r"\,) = " + f"{ss:g}")
-    details = []
-    for c in fac["conditions"]:
-        raw = int(cats[c["cat"]]) / c["min"] * 100
-        capped = min(raw, 100)
-        details.append(f"{c['cat']}: {int(cats[c['cat']])}/{c['min']} × 100 = "
-                       f"{raw:.1f} → ตัดที่ 100 = {capped:.1f}")
-    st.code("\n".join(details), language=None)
-    st.caption("ใช้ min เพราะเงื่อนไขความถนัดเชื่อมด้วย AND (∧): "
-               "หมวดที่อ่อนที่สุดกำหนดคะแนนรวม")
-
-    st.markdown("**ขั้นที่ 5 — สมการสุดท้าย**")
-    match_val = round(0.3 * ms + 0.7 * ss, 1)
-    st.latex(r"\text{Match\%} = 0.3\times\text{mbtiScore}"
-             r" + 0.7\times\text{subjScore}")
-    st.latex(r"\text{Match\%} = 0.3\times" + f"{ms:g}" +
-             r" + 0.7\times" + f"{ss:g} = " + f"{match_val:g}")
-
-
 # ---------------------------------------------------------------- main
 def main():
     st.set_page_config(page_title="แนะแนวคณะ", layout="wide")
@@ -807,7 +704,6 @@ def main():
             st.write(("✔ " if ok else "○ ") + label)
         if st.session_state["name"]:
             st.write(f"ผู้ใช้: **{st.session_state['name']}**")
-        st.checkbox("วิธีคำนวณ", key="show_calc")
         if st.session_state["admin_authenticated"]:
             st.checkbox("ประวัติผลลัพธ์", key="show_history")
             if st.button("ออกจากโหมดผู้ดูแล"):
@@ -823,9 +719,6 @@ def main():
                         st.rerun()
                     else:
                         st.error("รหัสผ่านไม่ถูกต้อง")
-
-    if st.session_state.get("show_calc"):
-        render_calc_explanation()
 
     if (st.session_state.get("show_history")
             and st.session_state.get("admin_authenticated")):
