@@ -4,7 +4,7 @@
 รับค่า type (เช่น "INTJ") จากแบบทดสอบ แล้วแสดง:
   1) ชื่อ type + nickname + คำอธิบาย
   2) Function stack 4 ตำแหน่ง เป็นการ์ดสี (Dominant -> Inferior)
-  3) Tabs: จุดแข็ง-จุดอ่อน / อาชีพแนะนำ / คำแนะนำพัฒนาตนเอง
+  3) Tabs: จุดแข็ง-จุดอ่อน / คำแนะนำพัฒนาตนเอง
 
 ธีมสีแยกตามกลุ่ม: Analysts=ม่วง, Diplomats=เขียว,
 Sentinels=น้ำเงิน, Explorers=ส้ม (ดูที่ mbti_data.py)
@@ -75,11 +75,9 @@ def _render_stack(t: str, color: str) -> None:
 
 
 def _render_tabs(t: str, color: str) -> None:
-    """Tabs แสดงจุดแข็ง-จุดอ่อน, อาชีพแนะนำ (chips) และคำแนะนำพัฒนาตนเอง"""
+    """Tabs แสดงจุดแข็ง-จุดอ่อน และคำแนะนำพัฒนาตนเอง"""
     info = MBTI_DATA[t]
-    tab_sw, tab_career, tab_growth = st.tabs(
-        ["จุดแข็ง – จุดอ่อน", "อาชีพที่เหมาะสม", "คำแนะนำการพัฒนาตนเอง"]
-    )
+    tab_sw, tab_growth = st.tabs(["จุดแข็ง – จุดอ่อน", "คำแนะนำการพัฒนาตนเอง"])
 
     # Tab 1: จุดแข็ง (ซ้าย) vs จุดอ่อน (ขวา) เทียบกัน
     with tab_sw:
@@ -93,21 +91,7 @@ def _render_tabs(t: str, color: str) -> None:
             for item in info["weaknesses"]:
                 st.markdown(f"- {item}")
 
-    # Tab 2: อาชีพแนะนำ แสดงเป็น chips/badges
-    with tab_career:
-        chips = "".join(
-            '<span style="display:inline-block; background:%s; '
-            'border:1px solid %s; color:#1F2937; padding:6px 16px; '
-            'margin:4px; border-radius:999px; font-size:0.95em;">%s</span>'
-            % (_rgba(color, 0.15), _rgba(color, 0.45), c)
-            for c in info["careers"]
-        )
-        st.markdown(
-            '<div style="line-height:2.4;">%s</div>' % chips,
-            unsafe_allow_html=True,
-        )
-
-    # Tab 3: คำแนะนำการพัฒนาตนเอง
+    # Tab 2: คำแนะนำการพัฒนาตนเอง
     with tab_growth:
         for i, tip in enumerate(info["growth_tips"], start=1):
             st.markdown(

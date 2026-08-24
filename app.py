@@ -453,10 +453,6 @@ def page_mbti_summary():
     # หน้าแสดงผลลัพธ์ MBTI แบบละเอียด (nickname, function stack, tabs)
     display_mbti_result(code)
 
-    strengths = st.session_state["function_strengths"]
-
-    st.plotly_chart(pie_functions(strengths))
-
     st.caption(DISCLAIMER)
 
     c1, c2 = st.columns([1, 1])
