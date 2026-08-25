@@ -691,6 +691,12 @@ def goto(step):
     st.rerun()
 
 
+def logout_admin():
+    """Clear admin-only UI state before Streamlit renders its widgets again."""
+    st.session_state["admin_authenticated"] = False
+    st.session_state["show_history"] = False
+
+
 def nav_back(step):
     if st.button("← ย้อนกลับ"):
         goto(step)
@@ -1159,10 +1165,7 @@ def main():
             st.write(f"ผู้ใช้: **{st.session_state['name']}**")
         if st.session_state["admin_authenticated"]:
             st.checkbox("ประวัติผลลัพธ์", key="show_history")
-            if st.button("ออกจากโหมดผู้ดูแล"):
-                st.session_state["admin_authenticated"] = False
-                st.session_state["show_history"] = False
-                st.rerun()
+            st.button("ออกจากโหมดผู้ดูแล", on_click=logout_admin)
         elif admin_password():
             with st.expander("สำหรับผู้ดูแล"):
                 password = st.text_input("รหัสผ่านผู้ดูแล", type="password")

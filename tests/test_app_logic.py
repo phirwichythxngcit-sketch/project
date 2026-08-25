@@ -69,6 +69,24 @@ class AdminHistoryAccessTests(unittest.TestCase):
         self.assertFalse(app.is_admin_password("incorrect-password"))
 
 
+class AdminLogoutTests(unittest.TestCase):
+    def setUp(self):
+        self.original_state = app.st.session_state
+        app.st.session_state = {
+            "admin_authenticated": True,
+            "show_history": True,
+        }
+
+    def tearDown(self):
+        app.st.session_state = self.original_state
+
+    def test_logout_clears_admin_only_state(self):
+        app.logout_admin()
+
+        self.assertFalse(app.st.session_state["admin_authenticated"])
+        self.assertFalse(app.st.session_state["show_history"])
+
+
 class StackSimilarityTests(unittest.TestCase):
     def test_exact_stack_is_100_percent(self):
         self.assertEqual(app.stack_similarity(
