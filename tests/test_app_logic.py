@@ -267,28 +267,22 @@ class FundingTierFilteringTests(unittest.TestCase):
             )
 
 
-class RankTableTieBreakDisplayTests(unittest.TestCase):
+class RankTableSortScoreDisplayTests(unittest.TestCase):
     def setUp(self):
         self.rows = [
             {"name": "ก", "match": 100.0, "mbtiScore": 100, "subjScore": 100,
-             "reason": "-"},
+             "sortScore": 181.84, "reason": "-"},
             {"name": "ข", "match": 100.0, "mbtiScore": 100, "subjScore": 100,
-             "reason": "-"},
+             "sortScore": 181.81, "reason": "-"},
             {"name": "ค", "match": 90.0, "mbtiScore": 90, "subjScore": 90,
-             "reason": "-"},
+             "sortScore": 90.04, "reason": "-"},
             {"name": "ง", "match": 80.0, "mbtiScore": 80, "subjScore": 80,
-             "reason": "-"},
+             "sortScore": 80.0, "reason": "-"},
             {"name": "จ", "match": 80.0, "mbtiScore": 80, "subjScore": 80,
-             "reason": "-"},
+             "sortScore": 79.96, "reason": "-"},
         ]
 
-    def test_tie_break_note_is_limited_to_rows_with_an_adjacent_match(self):
-        self.assertEqual(
-            [app.has_adjacent_match_tie(self.rows, i) for i in range(len(self.rows))],
-            [True, True, False, True, True],
-        )
-
-    def test_rendered_note_appears_only_for_tied_rows(self):
+    def test_rendered_scores_match_each_rows_sort_score(self):
         rendered = []
         previous_markdown = getattr(app.st, "markdown", None)
         app.st.markdown = lambda text, **_kwargs: rendered.append(text)
@@ -300,10 +294,13 @@ class RankTableTieBreakDisplayTests(unittest.TestCase):
             else:
                 app.st.markdown = previous_markdown
 
-        body_rows = re.findall(r'<tr[^>]*>(.*?)</tr>', rendered[0])
-        note = "จัดลำดับย่อยจากคะแนนละเอียดกว่า"
-        self.assertEqual(sum(note in row for row in body_rows), 4)
-        self.assertFalse(note in next(row for row in body_rows if "<b>ค</b>" in row))
+        tbody = re.search(r"<tbody>(.*?)</tbody>", rendered[0]).group(1)
+        body_rows = re.findall(r'<tr[^>]*>(.*?)</tr>', tbody)
+        self.assertEqual(len(body_rows), len(self.rows))
+        for row, expected in zip(body_rows, self.rows):
+            self.assertIn(f"คะแนนจัดอันดับ: {round(expected['sortScore'], 1)}", row)
+        self.assertNotIn("จัดลำดับย่อยจากคะแนนละเอียดกว่า", rendered[0])
+        self.assertIn("เมื่อ Match % เท่ากัน", rendered[0])
 
 
 class ZeroToFiveScaleTests(unittest.TestCase):
