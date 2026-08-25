@@ -94,28 +94,31 @@ input:focus,[data-baseweb="select"]>div:focus-within{
     border-color:var(--teal) !important;
     box-shadow:0 0 0 3px rgba(15,118,110,.15) !important;}
 
-/* ---------- score radio: 0 เทา → 5 ฟ้า ---------- */
+/* ---------- score radio: วงกลมสีเขียว ไล่ขนาด 0 → 5 ---------- */
 [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)){
-    display:flex;flex-direction:row;flex-wrap:wrap;gap:.6rem;padding:.25rem 0 .55rem;}
+    display:flex;flex-direction:row;align-items:center;flex-wrap:wrap;gap:.7rem;
+    min-height:84px;padding:.25rem 0 .55rem;}
 [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label{
-    --score-color:#9CA3AF;width:42px;height:42px;padding:0;margin:0;
+    --score-color:#20A464;width:36px;height:36px;padding:0;margin:0;
     border:2px solid var(--score-color);border-radius:999px;background:#fff;
     color:var(--score-color);display:flex;align-items:center;justify-content:center;
-    font-family:'Prompt','Sarabun',sans-serif;font-size:1rem;font-weight:700;
+    font-family:'Prompt','Sarabun',sans-serif;font-size:.88rem;font-weight:700;
     transition:transform .12s ease,background .12s ease,color .12s ease,box-shadow .12s ease;}
 [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:hover{
-    transform:translateY(-2px);background:color-mix(in srgb,var(--score-color) 12%,white);}
+    transform:translateY(-2px);background:rgba(32,164,100,.10);}
 [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:has(input:checked){
-    background:var(--score-color);color:#fff;box-shadow:0 3px 9px color-mix(in srgb,var(--score-color) 35%,transparent);}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label > div:first-child{
-    position:absolute;opacity:0;pointer-events:none;}
+    background:var(--score-color);color:#fff;box-shadow:0 3px 9px rgba(32,164,100,.32);}
+/* ซ่อนวงกลม radio ของ Streamlit โดยยังให้กด label เพื่อเลือกคะแนนได้ */
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label [data-baseweb="radio"],
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label input[type="radio"]{
+    display:none !important;}
 [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label p{margin:0;color:inherit;font:inherit;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(1){--score-color:#9CA3AF;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(2){--score-color:#E74C3C;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(3){--score-color:#F39C12;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(4){--score-color:#F1C40F;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(5){--score-color:#27AE60;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(6){--score-color:#3498DB;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(1){width:36px;height:36px;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(2){width:44px;height:44px;font-size:.94rem;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(3){width:52px;height:52px;font-size:1rem;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(4){width:60px;height:60px;font-size:1.08rem;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(5){width:68px;height:68px;font-size:1.16rem;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(6){width:76px;height:76px;font-size:1.24rem;}
 
 /* ---------- progress ---------- */
 [data-testid="stProgress"]{height:9px;border-radius:999px;
