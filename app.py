@@ -241,8 +241,11 @@ tr.rank3 td{background:rgba(180,121,74,.16);font-weight:600;}
 .matchbar{height:6px;border-radius:999px;background:rgba(15,118,110,.15);
     min-width:90px;margin-top:4px;}
 .matchbar i{display:block;height:100%;border-radius:999px;background:var(--teal);}
-.tiebreak-note{margin-top:3px;color:#6B7280;font-size:.72rem;font-weight:400;
+.sort-score-note{margin-top:3px;color:#6B7280;font-size:.72rem;font-weight:400;
     line-height:1.25;}
+.column-info{display:inline-flex;align-items:center;justify-content:center;
+    width:16px;height:16px;margin-left:4px;border:1px solid currentColor;
+    border-radius:999px;font-size:.68rem;vertical-align:middle;cursor:help;}
 </style>
 """
 
@@ -469,6 +472,11 @@ def subj_score_uncapped(fac, cat_scores):
     return min(ratios)
 
 
+def has_no_interest_preference(cat_scores):
+    """Return True only when all five interest-category totals are zero."""
+    return all(cat_scores.get(category, 0) == 0 for category in CAT_ORDER)
+
+
 def build_reason(fac, strengths, cat_scores):
     parts = []
     fn_pairs = sorted(((f, round(strengths[f])) for f in fac["functions"]),
@@ -487,14 +495,42 @@ def funding_tier_for_faculty(fac):
     return FACULTY_FUNDING_TIERS.get(fac["name"])
 
 
+FUNDING_TIER_ORDER = ("B1", "B2", "B3")
+
+
+def affordable_funding_tiers(budget_tier):
+    """Return the selected tier and every lower tier, highest one first."""
+    if budget_tier not in FUNDING_TIER_ORDER:
+        raise ValueError(f"Unknown budget tier: {budget_tier}")
+    selected_index = FUNDING_TIER_ORDER.index(budget_tier)
+    return tuple(reversed(FUNDING_TIER_ORDER[:selected_index + 1]))
+
+
+def order_rows_by_funding_tier(rows, budget_tier):
+    """Group affordable results from the highest affordable tier to the lowest.
+
+    Python's stable sort preserves the existing Match% / sortScore order within
+    every funding group, so this does not change the ranking tie-break rule.
+    """
+    tier_priority = {tier: index for index, tier in enumerate(
+        affordable_funding_tiers(budget_tier)
+    )}
+    return sorted(rows, key=lambda row: tier_priority[
+        funding_tier_for_faculty(row["_fac"])
+    ])
+
+
 def rank_faculties(strengths, cat_scores, budget_tier=None):
-    """Rank only faculties whose explicit funding tier matches the user's budget."""
+    """Rank faculties that do not exceed the user's selected funding tier."""
     if budget_tier is not None and budget_tier not in BUDGET_TIERS:
         raise ValueError(f"Unknown budget tier: {budget_tier}")
 
+    affordable_tiers = (affordable_funding_tiers(budget_tier)
+                         if budget_tier is not None else None)
     rows = []
     for fac in FACULTIES:
-        if budget_tier is not None and funding_tier_for_faculty(fac) != budget_tier:
+        if (affordable_tiers is not None
+                and funding_tier_for_faculty(fac) not in affordable_tiers):
             continue
         ms = mbti_score(fac, strengths)
         ss = subj_score(fac, cat_scores)
@@ -904,12 +940,16 @@ def page_results():
     cat_scores = st.session_state["cat_scores"]
     budget = st.session_state.get("budget_tier")
     rows = rank_faculties(strengths, cat_scores, budget)
+    rows = order_rows_by_funding_tier(rows, budget)
     top10 = rows[:10]
     tier_desc = BUDGET_TIERS[budget]["label"]
 
     st.header(f"ผลลัพธ์ของ{name_suffix()}")
     st.success(f"MBTI: **{st.session_state['derived_type']}** · "
                f"งบ: **{budget} ({tier_desc})**")
+    if has_no_interest_preference(cat_scores):
+        st.warning("ไม่พบคณะที่เข้ากันได้จากความชอบ เนื่องจากคะแนนความชอบทุกหมวดเป็น 0 "
+                   "จึงแสดงผลคณะที่เข้ากับ MBTI ให้แทน")
 
     if top10:
         # คณะที่ Match สูงสุด 3 อันดับ แสดงก่อนตาราง
@@ -963,17 +1003,14 @@ def name_suffix():
     return f" {n}" if n else ""
 
 
-def has_adjacent_match_tie(rows, index):
-    """Return whether a row shares its displayed Match % with a neighbor."""
-    match = rows[index]["match"]
-    return ((index > 0 and rows[index - 1]["match"] == match)
-            or (index + 1 < len(rows) and rows[index + 1]["match"] == match))
-
-
 def render_rank_table(rows):
     """ตารางแนะนำ 10 อันดับ — เน้นแถวอันดับ 1-3 ให้เด่นกว่าอันดับที่เหลือ"""
-    head_cols = ["อันดับ", "คณะ/สาขา", "Match %", "MBTI Score", "Subj Score",
-                 "เหตุผล"]
+    match_header = (
+        'Match %<span class="column-info" title="เมื่อ Match % เท่ากัน '
+        'ระบบเรียงต่อด้วยคะแนนจัดอันดับนี้ (ไม่ปัดเศษ) แล้วจึงเรียงตามชื่อคณะ '
+        'ก-ฮ เป็นลำดับสุดท้าย" aria-label="คำอธิบายการจัดอันดับ">ⓘ</span>'
+    )
+    head_cols = ["อันดับ", "คณะ/สาขา", match_header, "MBTI Score", "Subj Score"]
     head = "".join(f"<th>{c}</th>" for c in head_cols)
     body = []
     for i, r in enumerate(rows):
@@ -981,20 +1018,19 @@ def render_rank_table(rows):
                else "rank3 top" if i == 2 else "")
         badge_cls = f"b{i + 1}" if i < 3 else "bn"
         pct = min(max(r["match"], 0), 100)
-        tie_break_note = (
-            '<div class="tiebreak-note">จัดลำดับย่อยจากคะแนนละเอียดกว่า</div>'
-            if has_adjacent_match_tie(rows, i) else ""
+        sort_score_note = (
+            f'<div class="sort-score-note">คะแนนจัดอันดับ: '
+            f'{round(r["sortScore"], 1)}</div>'
         )
         cells = [
             f'<td><span class="badge {badge_cls}">{i + 1}</span></td>',
             f'<td><b>{html.escape(r["name"])}</b></td>',
             '<td style="min-width:110px">'
             f'<div style="font-weight:700">{r["match"]}%</div>'
-            f'{tie_break_note}'
+            f'{sort_score_note}'
             f'<div class="matchbar"><i style="width:{pct}%"></i></div></td>',
             f'<td>{r["mbtiScore"]}</td>',
             f'<td>{r["subjScore"]}</td>',
-            f'<td style="max-width:280px">{html.escape(r["reason"])}</td>',
         ]
         body.append(f'<tr class="{cls}">' + "".join(cells) + "</tr>")
     st.markdown(

@@ -95,6 +95,18 @@ class InterestQuestionParsingTests(unittest.TestCase):
         )
 
 
+class InterestPreferenceStatusTests(unittest.TestCase):
+    def test_all_zero_interest_scores_show_the_mbti_only_notice(self):
+        self.assertTrue(app.has_no_interest_preference({
+            "M": 0, "S": 0, "L": 0, "H": 0, "A": 0,
+        }))
+
+    def test_any_nonzero_interest_score_does_not_show_the_mbti_only_notice(self):
+        self.assertFalse(app.has_no_interest_preference({
+            "M": 0, "S": 0, "L": 1, "H": 0, "A": 0,
+        }))
+
+
 class FacultyRankingTests(unittest.TestCase):
     def setUp(self):
         self.original_faculties = app.FACULTIES
@@ -235,37 +247,54 @@ class FundingTierFilteringTests(unittest.TestCase):
             app.funding_tier_for_faculty(row["_fac"]) == "B1" for row in rows
         ))
 
-    def test_high_funding_contains_dentistry_and_excludes_low_cost_faculties(self):
+    def test_high_funding_includes_every_affordable_tier(self):
         rows = app.rank_faculties(self.strengths, self.cat_scores, "B3")
         names = {row["name"] for row in rows}
 
         self.assertIn("ทันตแพทยศาสตร์", names)
-        self.assertNotIn("นิติศาสตร์", names)
-        self.assertNotIn("วิศวกรรมเครื่องกล", names)
+        self.assertIn("วิศวกรรมเครื่องกล", names)
+        self.assertIn("นิติศาสตร์", names)
+
+    def test_medium_funding_includes_medium_and_low_but_not_high(self):
+        rows = app.rank_faculties(self.strengths, self.cat_scores, "B2")
+        names = {row["name"] for row in rows}
+
+        self.assertIn("วิศวกรรมเครื่องกล", names)
+        self.assertIn("นิติศาสตร์", names)
+        self.assertNotIn("ทันตแพทยศาสตร์", names)
+
+    def test_display_orders_affordable_tiers_highest_first(self):
+        rows = app.rank_faculties(self.strengths, self.cat_scores, "B3")
+        displayed = app.order_rows_by_funding_tier(rows, "B3")
+        tiers = [app.funding_tier_for_faculty(row["_fac"]) for row in displayed]
+
+        self.assertEqual(tiers, sorted(tiers, reverse=True))
+        for tier in app.affordable_funding_tiers("B3"):
+            tier_rows = [row for row in displayed
+                         if app.funding_tier_for_faculty(row["_fac"]) == tier]
+            self.assertEqual(
+                tier_rows,
+                sorted(tier_rows, key=lambda row: (
+                    -row["match"], -row["sortScore"], row["name"])),
+            )
 
 
-class RankTableTieBreakDisplayTests(unittest.TestCase):
+class RankTableSortScoreDisplayTests(unittest.TestCase):
     def setUp(self):
         self.rows = [
             {"name": "ก", "match": 100.0, "mbtiScore": 100, "subjScore": 100,
-             "reason": "-"},
+             "sortScore": 181.84, "reason": "-"},
             {"name": "ข", "match": 100.0, "mbtiScore": 100, "subjScore": 100,
-             "reason": "-"},
+             "sortScore": 181.81, "reason": "-"},
             {"name": "ค", "match": 90.0, "mbtiScore": 90, "subjScore": 90,
-             "reason": "-"},
+             "sortScore": 90.04, "reason": "-"},
             {"name": "ง", "match": 80.0, "mbtiScore": 80, "subjScore": 80,
-             "reason": "-"},
+             "sortScore": 80.0, "reason": "-"},
             {"name": "จ", "match": 80.0, "mbtiScore": 80, "subjScore": 80,
-             "reason": "-"},
+             "sortScore": 79.96, "reason": "-"},
         ]
 
-    def test_tie_break_note_is_limited_to_rows_with_an_adjacent_match(self):
-        self.assertEqual(
-            [app.has_adjacent_match_tie(self.rows, i) for i in range(len(self.rows))],
-            [True, True, False, True, True],
-        )
-
-    def test_rendered_note_appears_only_for_tied_rows(self):
+    def test_rendered_scores_match_each_rows_sort_score(self):
         rendered = []
         previous_markdown = getattr(app.st, "markdown", None)
         app.st.markdown = lambda text, **_kwargs: rendered.append(text)
@@ -277,10 +306,14 @@ class RankTableTieBreakDisplayTests(unittest.TestCase):
             else:
                 app.st.markdown = previous_markdown
 
-        body_rows = re.findall(r'<tr[^>]*>(.*?)</tr>', rendered[0])
-        note = "จัดลำดับย่อยจากคะแนนละเอียดกว่า"
-        self.assertEqual(sum(note in row for row in body_rows), 4)
-        self.assertFalse(note in next(row for row in body_rows if "<b>ค</b>" in row))
+        tbody = re.search(r"<tbody>(.*?)</tbody>", rendered[0]).group(1)
+        body_rows = re.findall(r'<tr[^>]*>(.*?)</tr>', tbody)
+        self.assertEqual(len(body_rows), len(self.rows))
+        for row, expected in zip(body_rows, self.rows):
+            self.assertIn(f"คะแนนจัดอันดับ: {round(expected['sortScore'], 1)}", row)
+        self.assertNotIn("จัดลำดับย่อยจากคะแนนละเอียดกว่า", rendered[0])
+        self.assertIn("เมื่อ Match % เท่ากัน", rendered[0])
+        self.assertNotIn("เหตุผล", rendered[0])
 
 
 class ZeroToFiveScaleTests(unittest.TestCase):
