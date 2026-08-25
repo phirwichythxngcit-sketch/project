@@ -508,7 +508,6 @@ def rank_faculties(strengths, cat_scores, budget_tier=None):
             "match": match,
             "sortScore": sort_score,
             "reason": build_reason(fac, strengths, cat_scores),
-            "uni": fac["budget"].get(st.session_state.get("budget_tier"), "-"),
             "_fac": fac,
         })
     # Keep the table in descending order of the Match% shown to users.
@@ -920,13 +919,9 @@ def page_results():
                          + ", ".join(fac["functions"]) + f" (scope: {fac['scope']})")
                 st.write("**เงื่อนไขความชอบ:** "
                          + "; ".join(f"{c['cat']} ≥ {c['min']}" for c in fac["conditions"]))
-                for k in tier_keys_all():
-                    b = fac["budget"].get(k, "-")
-                    t = BUDGET_TIERS[k]
-                    st.write(f"- **{k} ({t['label']})**: {b}")
 
         st.subheader("คณะแนะนำ 10 อันดับแรก")
-        render_rank_table(top10, budget)
+        render_rank_table(top10)
     else:
         st.warning("ไม่พบคณะที่ตรงกับระดับเงินทุนที่เลือก")
 
@@ -961,19 +956,15 @@ def page_results():
         goto("welcome")
 
 
-def tier_keys_all():
-    return ["B1", "B2", "B3"]
-
-
 def name_suffix():
     n = st.session_state.get("name")
     return f" {n}" if n else ""
 
 
-def render_rank_table(rows, budget):
+def render_rank_table(rows):
     """ตารางแนะนำ 10 อันดับ — เน้นแถวอันดับ 1-3 ให้เด่นกว่าอันดับที่เหลือ"""
     head_cols = ["อันดับ", "คณะ/สาขา", "Match %", "MBTI Score", "Subj Score",
-                 "เหตุผล", f"ตัวอย่างมหาวิทยาลัย ({budget})"]
+                 "เหตุผล"]
     head = "".join(f"<th>{c}</th>" for c in head_cols)
     body = []
     for i, r in enumerate(rows):
@@ -990,7 +981,6 @@ def render_rank_table(rows, budget):
             f'<td>{r["mbtiScore"]}</td>',
             f'<td>{r["subjScore"]}</td>',
             f'<td style="max-width:280px">{html.escape(r["reason"])}</td>',
-            f'<td>{html.escape(str(r["uni"]))}</td>',
         ]
         body.append(f'<tr class="{cls}">' + "".join(cells) + "</tr>")
     st.markdown(

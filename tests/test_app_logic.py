@@ -137,6 +137,11 @@ class FacultyRankingTests(unittest.TestCase):
             ["ก คณะที่เกินเกณฑ์น้อยกว่า", "ฮ คณะที่เกินเกณฑ์มากกว่า"],
         )
 
+    def test_ranked_rows_do_not_include_university_examples(self):
+        rows = app.rank_faculties(self.strengths, self.cat_scores)
+
+        self.assertTrue(all("uni" not in row for row in rows))
+
 
     def test_display_match_percentage_is_the_primary_ranking_order(self):
         app.FACULTIES = [
