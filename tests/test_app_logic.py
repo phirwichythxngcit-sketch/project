@@ -203,5 +203,24 @@ class FacultyRankingTests(unittest.TestCase):
                 )
 
 
+class ZeroToFiveScaleTests(unittest.TestCase):
+    def test_mbti_raw_score_zero_normalizes_to_zero_percent(self):
+        raw_scores = {function: 0 for function in app.FN_ORDER}
+        self.assertEqual(
+            app.strengths_from_raw(raw_scores),
+            {function: 0.0 for function in app.FN_ORDER},
+        )
+
+    def test_mbti_raw_score_fifty_normalizes_to_one_hundred_percent(self):
+        raw_scores = {function: 50 for function in app.FN_ORDER}
+        self.assertEqual(
+            app.strengths_from_raw(raw_scores),
+            {function: 100.0 for function in app.FN_ORDER},
+        )
+
+    def test_zero_to_five_scale_has_six_ordered_choices(self):
+        self.assertEqual(app.SCALE_0_5, ["0", "1", "2", "3", "4", "5"])
+
+
 if __name__ == "__main__":
     unittest.main()

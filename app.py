@@ -46,8 +46,8 @@ CAT_TH = {
 SELF_STRENGTH = [100, 70, 35, 10]  # Dom -> Aux -> Tert -> Inf
 STACK_WEIGHTS = [0.4, 0.3, 0.2, 0.1]
 MAX_STACK_SCORE = sum(STACK_WEIGHTS)
-SCALE_1_5 = ["1 — ไม่เห็นด้วยอย่างยิ่ง", "2 — ไม่เห็นด้วย", "3 — เฉยๆ / ไม่แน่ใจ",
-             "4 — เห็นด้วย", "5 — เห็นด้วยอย่างยิ่ง"]
+SCALE_0_5 = [str(i) for i in range(6)]
+SCALE_HELP = "0 = ไม่ใช่เลย · 1 = น้อยมาก · 2 = น้อย · 3 = ปานกลาง · 4 = มาก · 5 = มากที่สุด"
 DISCLAIMER = ("นี่คือผลโดยประมาณเพื่อการสำรวจตนเอง "
               "ไม่ใช่ผลวินิจฉัยที่ตายตัว")
 
@@ -94,11 +94,28 @@ input:focus,[data-baseweb="select"]>div:focus-within{
     border-color:var(--teal) !important;
     box-shadow:0 0 0 3px rgba(15,118,110,.15) !important;}
 
-/* ---------- radio (โหมดทำแบบสอบถาม: หายใจได้ ไม่อึดอัด) ---------- */
-[data-testid="stRadio"] [role="radiogroup"]{gap:.55rem;padding:.15rem 0;}
-[data-testid="stRadio"] label{padding:.42rem .6rem;margin:0;border-radius:9px;
-    transition:background .1s ease;}
-[data-testid="stRadio"] label:hover{background:rgba(15,118,110,.07);}
+/* ---------- score radio: 0 เทา → 5 ฟ้า ---------- */
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)){
+    display:flex;flex-direction:row;flex-wrap:wrap;gap:.6rem;padding:.25rem 0 .55rem;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label{
+    --score-color:#9CA3AF;width:42px;height:42px;padding:0;margin:0;
+    border:2px solid var(--score-color);border-radius:999px;background:#fff;
+    color:var(--score-color);display:flex;align-items:center;justify-content:center;
+    font-family:'Prompt','Sarabun',sans-serif;font-size:1rem;font-weight:700;
+    transition:transform .12s ease,background .12s ease,color .12s ease,box-shadow .12s ease;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:hover{
+    transform:translateY(-2px);background:color-mix(in srgb,var(--score-color) 12%,white);}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:has(input:checked){
+    background:var(--score-color);color:#fff;box-shadow:0 3px 9px color-mix(in srgb,var(--score-color) 35%,transparent);}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label > div:first-child{
+    position:absolute;opacity:0;pointer-events:none;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label p{margin:0;color:inherit;font:inherit;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(1){--score-color:#9CA3AF;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(2){--score-color:#E74C3C;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(3){--score-color:#F39C12;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(4){--score-color:#F1C40F;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(5){--score-color:#27AE60;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(6){--score-color:#3498DB;}
 
 /* ---------- progress ---------- */
 [data-testid="stProgress"]{height:9px;border-radius:999px;
@@ -259,8 +276,8 @@ def strengths_from_type(type_code):
 
 
 def strengths_from_raw(raw_scores):
-    """เส้นทาง 'ทำแบบทดสอบ': normalize (raw-10)/40*100"""
-    return {f: round((raw_scores[f] - 10) / 40 * 100, 1) for f in FN_ORDER}
+    """เส้นทาง 'ทำแบบทดสอบ': normalize คะแนน 0–50 เป็น 0–100."""
+    return {f: round(raw_scores[f] / 50 * 100, 1) for f in FN_ORDER}
 
 
 def stack_similarity(top4, stack):
@@ -594,8 +611,8 @@ def page_function_test(fn_questions):
     unanswered = []
     for i, q in enumerate(fn_questions[func]):
         key = f"ans_{func}_{i}"
-        val = st.radio(f"{idx * 10 + i + 1}. {q}", SCALE_1_5, index=None,
-                       key=key, horizontal=False)
+        val = st.radio(f"{idx * 10 + i + 1}. {q}", SCALE_0_5, index=None,
+                       key=key, horizontal=True)
         if val is None:
             unanswered.append(idx * 10 + i + 1)
 
@@ -665,15 +682,16 @@ def page_interest_survey(survey):
     st.progress(len(st.session_state["interest_answers"]) / 5,
                 text=f"หมวดที่ {len(st.session_state['interest_answers'])}/5 เสร็จสิ้น")
     st.header(f"หมวด {idx + 1}/5: {block['title']}")
-    st.caption("ให้คะแนนแต่ละข้อ 1–5 (1 = ไม่ใช่เลย, 5 = ใช่มากที่สุด)")
+    st.caption(f"ให้คะแนนแต่ละข้อ 0–5 · {SCALE_HELP}")
 
     answers = st.session_state["interest_answers"].get(cat, {})
     unanswered = []
     for i, q in enumerate(block["questions"]):
         key = f"in_{cat}_{i}"
         default = saved_answer_at(answers, i)
-        d_idx = default - 1 if isinstance(default, int) else None
-        val = st.radio(f"{i + 1}. {q}", SCALE_1_5, index=d_idx, key=key)
+        d_idx = default if isinstance(default, int) and 0 <= default <= 5 else None
+        val = st.radio(f"{i + 1}. {q}", SCALE_0_5, index=d_idx, key=key,
+                       horizontal=True)
         if val is None:
             unanswered.append(i + 1)
 
