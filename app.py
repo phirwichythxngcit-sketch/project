@@ -215,8 +215,12 @@ def parse_function_questions():
 
 
 @st.cache_data(show_spinner=False)
-def parse_interest_questions():
-    """Parse ความชอบ2.txt -> {cat: {"title": ..., "questions": [20 items]}}"""
+def parse_interest_questions(file_mtime_ns):
+    """Parse ความชอบ2.txt -> {cat: {"title": ..., "questions": [20 items]}}.
+
+    The mtime is deliberately a cache key: changes to the question file must
+    invalidate Streamlit's cached survey data.
+    """
     text = (DATA_DIR / "ความชอบ2.txt").read_text(encoding="utf-8-sig")
     titles = {}
     questions = {}
@@ -865,7 +869,8 @@ def main():
     init_session()
 
     fn_questions = parse_function_questions()
-    survey = parse_interest_questions()
+    interest_file = DATA_DIR / "ความชอบ2.txt"
+    survey = parse_interest_questions(interest_file.stat().st_mtime_ns)
 
     with st.sidebar:
         st.header("แบบสอบถามแนะแนวคณะ")
