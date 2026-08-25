@@ -80,5 +80,18 @@ class StackSimilarityTests(unittest.TestCase):
             ["Te", "Fe", "Fi", "Se"], ["Ti", "Ne", "Si", "Fe"]), 0.0)
 
 
+class InterestQuestionParsingTests(unittest.TestCase):
+    def test_interest_questions_are_loaded_from_the_new_source_file(self):
+        source = app.DATA_DIR / "ความชอบ2.txt"
+        survey = app.parse_interest_questions(source.stat().st_mtime_ns)
+
+        self.assertEqual(len(survey), 5)
+        self.assertEqual(len(survey["M"]["questions"]), 20)
+        self.assertEqual(
+            survey["M"]["questions"][0],
+            "เวลาเจอโจทย์เลขที่ยากมากๆ คุณรู้สึกอยากลองแก้ไปเรื่อยๆ จนกว่าจะได้คำตอบ",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
