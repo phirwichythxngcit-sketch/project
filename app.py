@@ -310,6 +310,25 @@ MBTI_TYPES = load_json("mbti_type_descriptions.json")
 BUDGET_TIERS = FACULTY_DB["budgetTiers"]
 FACULTIES = FACULTY_DB["facultyDatabase"]
 
+# งบที่ผู้ใช้เลือกเป็นเกณฑ์คัดกรองคณะที่แนะนำ ไม่ใช่เพียงข้อความ
+# ประกอบตัวอย่างมหาวิทยาลัยในตารางผลลัพธ์. B1/B2/B3 ตรงกับ
+# ต่ำ/ปานกลาง/สูง ตามเกณฑ์ค่าใช้จ่ายต่อภาคการศึกษาที่กำหนดไว้.
+HIGH_FUNDING_FACULTIES = frozenset({
+    "แพทยศาสตร์", "ทันตแพทยศาสตร์", "เภสัชศาสตร์", "สัตวแพทยศาสตร์",
+    "ดุริยางคศาสตร์ (ดนตรี)", "ภาพยนตร์และสื่อดิจิทัล", "UX/UI Design",
+    "Game Design", "Computer Graphics/Digital Animation",
+})
+LOW_FUNDING_HYBRID_FACULTIES = frozenset({
+    "สังคมศาสตร์สิ่งแวดล้อม", "นโยบายสาธารณสุข",
+    "ความสัมพันธ์ระหว่างประเทศ", "นักการทูต", "ธุรกิจ/การตลาดระหว่างประเทศ",
+})
+MEDIUM_FUNDING_HYBRID_FACULTIES = frozenset({
+    "จิตวิทยาคลินิก", "คณิตศาสตร์ประกันภัย (Actuarial Science)", "FinTech",
+    "ชีวสารสนเทศศาสตร์ (Bioinformatics)",
+})
+LOW_FUNDING_GROUPS = frozenset({"Language", "Social"})
+MEDIUM_FUNDING_GROUPS = frozenset({"STEM", "Health", "Arts"})
+
 
 # ---------------------------------------------------------------- scoring core
 def strengths_from_type(type_code):
@@ -401,9 +420,32 @@ def build_reason(fac, strengths, cat_scores):
     return " · ".join(parts)
 
 
-def rank_faculties(strengths, cat_scores):
+def funding_tier_for_faculty(fac):
+    """Return the required funding tier for a faculty, or None when unclassified.
+
+    Fail closed for a new/unclassified record: it must not appear in a filtered
+    result until its funding tier has been explicitly assigned.
+    """
+    name = fac["name"]
+    group = fac["group"]
+    if name in HIGH_FUNDING_FACULTIES:
+        return "B3"
+    if group in LOW_FUNDING_GROUPS or name in LOW_FUNDING_HYBRID_FACULTIES:
+        return "B1"
+    if group in MEDIUM_FUNDING_GROUPS or name in MEDIUM_FUNDING_HYBRID_FACULTIES:
+        return "B2"
+    return None
+
+
+def rank_faculties(strengths, cat_scores, budget_tier=None):
+    """Rank faculties, retaining only the selected funding tier when provided."""
+    if budget_tier is not None and budget_tier not in BUDGET_TIERS:
+        raise ValueError(f"Unknown budget tier: {budget_tier}")
+
     rows = []
     for fac in FACULTIES:
+        if budget_tier is not None and funding_tier_for_faculty(fac) != budget_tier:
+            continue
         ms = mbti_score(fac, strengths)
         ss = subj_score(fac, cat_scores)
         ms_uncapped = mbti_score_uncapped(fac, strengths)
@@ -812,7 +854,7 @@ def page_results():
     strengths = st.session_state["function_strengths"]
     cat_scores = st.session_state["cat_scores"]
     budget = st.session_state.get("budget_tier")
-    rows = rank_faculties(strengths, cat_scores)
+    rows = rank_faculties(strengths, cat_scores, budget)
     top10 = rows[:10]
     tier_desc = BUDGET_TIERS[budget]["label"]
 
@@ -820,22 +862,25 @@ def page_results():
     st.success(f"MBTI: **{st.session_state['derived_type']}** · "
                f"งบ: **{budget} ({tier_desc})**")
 
-    # คณะที่ Match สูงสุด 3 อันดับ แสดงก่อนตาราง
-    medals = ["🥇", "🥈", "🥉"]
-    for i, r in enumerate(top10[:3], start=1):
-        fac = r["_fac"]
-        with st.expander(f"{medals[i - 1]} #{i} {r['name']} — Match {r['match']}%"):
-            st.write("**ฟังก์ชันที่ต้องการ:** "
-                     + ", ".join(fac["functions"]) + f" (scope: {fac['scope']})")
-            st.write("**เงื่อนไขความชอบ:** "
-                     + "; ".join(f"{c['cat']} ≥ {c['min']}" for c in fac["conditions"]))
-            for k in tier_keys_all():
-                b = fac["budget"].get(k, "-")
-                t = BUDGET_TIERS[k]
-                st.write(f"- **{k} ({t['label']})**: {b}")
+    if top10:
+        # คณะที่ Match สูงสุด 3 อันดับ แสดงก่อนตาราง
+        medals = ["🥇", "🥈", "🥉"]
+        for i, r in enumerate(top10[:3], start=1):
+            fac = r["_fac"]
+            with st.expander(f"{medals[i - 1]} #{i} {r['name']} — Match {r['match']}%"):
+                st.write("**ฟังก์ชันที่ต้องการ:** "
+                         + ", ".join(fac["functions"]) + f" (scope: {fac['scope']})")
+                st.write("**เงื่อนไขความชอบ:** "
+                         + "; ".join(f"{c['cat']} ≥ {c['min']}" for c in fac["conditions"]))
+                for k in tier_keys_all():
+                    b = fac["budget"].get(k, "-")
+                    t = BUDGET_TIERS[k]
+                    st.write(f"- **{k} ({t['label']})**: {b}")
 
-    st.subheader("คณะแนะนำ 10 อันดับแรก")
-    render_rank_table(top10, budget)
+        st.subheader("คณะแนะนำ 10 อันดับแรก")
+        render_rank_table(top10, budget)
+    else:
+        st.warning("ไม่พบคณะที่ตรงกับระดับเงินทุนที่เลือก")
 
     st.divider()
     st.subheader("บันทึกผลลัพธ์")

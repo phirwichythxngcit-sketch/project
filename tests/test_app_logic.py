@@ -203,6 +203,45 @@ class FacultyRankingTests(unittest.TestCase):
                 )
 
 
+class FundingTierFilteringTests(unittest.TestCase):
+    def setUp(self):
+        self.strengths = {"Ti": 100, "Te": 0, "Fe": 0, "Fi": 0,
+                          "Se": 0, "Si": 0, "Ne": 0, "Ni": 0}
+        self.cat_scores = {"M": 100, "S": 100, "L": 100, "H": 100, "A": 100}
+
+    def test_policy_assigns_requested_tiers(self):
+        dentist = next(f for f in app.FACULTIES if f["name"] == "ทันตแพทยศาสตร์")
+        engineering = next(f for f in app.FACULTIES if f["name"] == "วิศวกรรมเครื่องกล")
+        law = next(f for f in app.FACULTIES if f["name"] == "นิติศาสตร์")
+
+        self.assertEqual(app.funding_tier_for_faculty(dentist), "B3")
+        self.assertEqual(app.funding_tier_for_faculty(engineering), "B2")
+        self.assertEqual(app.funding_tier_for_faculty(law), "B1")
+
+    def test_selected_tier_filters_out_nonmatching_faculties(self):
+        rows = app.rank_faculties(self.strengths, self.cat_scores, "B1")
+        names = {row["name"] for row in rows}
+
+        self.assertIn("นิติศาสตร์", names)
+        self.assertNotIn("ทันตแพทยศาสตร์", names)
+        self.assertNotIn("วิศวกรรมเครื่องกล", names)
+        self.assertTrue(all(
+            app.funding_tier_for_faculty(row["_fac"]) == "B1" for row in rows
+        ))
+
+    def test_every_current_faculty_has_an_explicit_funding_tier(self):
+        unclassified = [
+            faculty["name"] for faculty in app.FACULTIES
+            if app.funding_tier_for_faculty(faculty) is None
+        ]
+        self.assertEqual(unclassified, [])
+
+    def test_unclassified_faculty_is_excluded_when_filtering(self):
+        self.assertIsNone(app.funding_tier_for_faculty({
+            "name": "สาขาที่ยังไม่กำหนด", "group": "Unknown",
+        }))
+
+
 class ZeroToFiveScaleTests(unittest.TestCase):
     def test_mbti_raw_score_zero_normalizes_to_zero_percent(self):
         raw_scores = {function: 0 for function in app.FN_ORDER}
