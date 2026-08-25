@@ -585,6 +585,26 @@ def save_result(payload, db_path=DB_PATH):
     return rid
 
 
+def result_payload(strengths, cat_scores, budget):
+    """Build the history record at the moment a user confirms their budget."""
+    rows = order_rows_by_funding_tier(
+        rank_faculties(strengths, cat_scores, budget), budget
+    )
+    return {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "name": st.session_state["name"],
+        "mbti_method": "เลือกเอง" if st.session_state["mbti_route"] == "self"
+                       else "ทำแบบทดสอบ",
+        "mbti_type": st.session_state["derived_type"],
+        **{f: round(strengths[f], 1) for f in FN_ORDER},
+        **{c: int(cat_scores[c]) for c in CAT_ORDER},
+        "budget": budget,
+        "top_faculties": " | ".join(
+            f"{i}. {r['name']} ({r['match']}%)"
+            for i, r in enumerate(rows[:3], 1)),
+    }
+
+
 def load_history(db_path=DB_PATH):
     if not Path(db_path).exists():
         return pd.DataFrame()
@@ -931,8 +951,18 @@ def page_budget():
         nav_back("interest_survey")
     with c2:
         if st.button("ยืนยันและดูผลลัพธ์ →", type="primary", disabled=(sel is None)):
-            st.session_state["budget_tier"] = tier_keys[opts.index(sel)]
-            goto("results")
+            budget = tier_keys[opts.index(sel)]
+            try:
+                payload = result_payload(
+                    st.session_state["function_strengths"],
+                    st.session_state["cat_scores"],
+                    budget,
+                )
+                st.session_state["saved_id"] = save_result(payload)
+                st.session_state["budget_tier"] = budget
+                goto("results")
+            except Exception as e:
+                st.error(f"บันทึกประวัติไม่สำเร็จ: {e}")
 
 
 def page_results():
@@ -947,6 +977,8 @@ def page_results():
     st.header(f"ผลลัพธ์ของ{name_suffix()}")
     st.success(f"MBTI: **{st.session_state['derived_type']}** · "
                f"งบ: **{budget} ({tier_desc})**")
+    if st.session_state.get("saved_id") is not None:
+        st.caption("บันทึกผลลัพธ์ลงประวัติเรียบร้อยแล้ว")
     if has_no_interest_preference(cat_scores):
         st.warning("ไม่พบคณะที่เข้ากันได้จากความชอบ เนื่องจากคะแนนความชอบทุกหมวดเป็น 0 "
                    "จึงแสดงผลคณะที่เข้ากับ MBTI ให้แทน")
@@ -966,30 +998,6 @@ def page_results():
         render_rank_table(top10)
     else:
         st.warning("ไม่พบคณะที่ตรงกับระดับเงินทุนที่เลือก")
-
-    st.divider()
-    st.subheader("บันทึกผลลัพธ์")
-    if st.session_state.get("saved_id") is not None:
-        st.info(f"บันทึกเรียบร้อยแล้ว (record id = {st.session_state['saved_id']})")
-    else:
-        if st.button("บันทึกผลลัพธ์ลง SQLite (results.db)", type="primary"):
-            payload = {
-                "timestamp": datetime.now().isoformat(timespec="seconds"),
-                "name": st.session_state["name"],
-                "mbti_method": "เลือกเอง" if st.session_state["mbti_route"] == "self"
-                               else "ทำแบบทดสอบ",
-                "mbti_type": st.session_state["derived_type"],
-                **{f: round(strengths[f], 1) for f in FN_ORDER},
-                **{c: int(cat_scores[c]) for c in CAT_ORDER},
-                "budget": budget,
-                "top_faculties": " | ".join(
-                    f"{i}. {r['name']} ({r['match']}%)" for i, r in enumerate(top10[:3], 1)),
-            }
-            try:
-                st.session_state["saved_id"] = save_result(payload)
-                st.success(f"บันทึกสำเร็จ (record id = {st.session_state['saved_id']})")
-            except Exception as e:
-                st.error(f"บันทึกไม่สำเร็จ: {e}")
 
     if st.button("เริ่มใหม่ทั้งหมด"):
         for k in list(st.session_state.keys()):

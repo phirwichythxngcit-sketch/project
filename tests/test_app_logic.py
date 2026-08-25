@@ -1,6 +1,7 @@
 import importlib.util
 import re
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -105,6 +106,32 @@ class InterestPreferenceStatusTests(unittest.TestCase):
         self.assertFalse(app.has_no_interest_preference({
             "M": 0, "S": 0, "L": 1, "H": 0, "A": 0,
         }))
+
+
+class ResultHistoryTests(unittest.TestCase):
+    def setUp(self):
+        self.original_state = app.st.session_state
+        app.st.session_state = {
+            "name": "นักเรียนทดสอบ",
+            "mbti_route": "self",
+            "derived_type": "INTJ",
+        }
+        self.strengths = {"Ti": 100, "Te": 70, "Fe": 0, "Fi": 0,
+                          "Se": 0, "Si": 35, "Ne": 0, "Ni": 100}
+        self.cat_scores = {"M": 70, "S": 80, "L": 60, "H": 50, "A": 40}
+
+    def tearDown(self):
+        app.st.session_state = self.original_state
+
+    def test_budget_confirmation_payload_can_be_saved_without_results_page_click(self):
+        payload = app.result_payload(self.strengths, self.cat_scores, "B1")
+
+        self.assertEqual(payload["budget"], "B1")
+        self.assertEqual(payload["name"], "นักเรียนทดสอบ")
+        self.assertTrue(payload["top_faculties"])
+        with tempfile.TemporaryDirectory() as directory:
+            record_id = app.save_result(payload, Path(directory) / "results.db")
+        self.assertGreater(record_id, 0)
 
 
 class FacultyRankingTests(unittest.TestCase):
