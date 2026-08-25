@@ -9,6 +9,7 @@ def load_app():
     streamlit = types.ModuleType("streamlit")
     streamlit.cache_data = lambda **_kwargs: lambda func: func
     streamlit.session_state = {}
+    streamlit.secrets = {}
     sys.modules["streamlit"] = streamlit
     sys.modules.setdefault("pandas", types.ModuleType("pandas"))
     plotly = types.ModuleType("plotly")
@@ -201,6 +202,40 @@ class FacultyRankingTests(unittest.TestCase):
                     sorted(rows[:10], key=lambda row: (
                         -row["match"], -row["sortScore"], row["name"])),
                 )
+
+
+class FundingTierFilteringTests(unittest.TestCase):
+    def setUp(self):
+        self.strengths = {"Ti": 100, "Te": 0, "Fe": 0, "Fi": 0,
+                          "Se": 0, "Si": 0, "Ne": 0, "Ni": 0}
+        self.cat_scores = {"M": 100, "S": 100, "L": 100, "H": 100, "A": 100}
+
+    def test_every_faculty_is_explicitly_assigned_to_one_funding_group(self):
+        unassigned = [
+            faculty["name"] for faculty in app.FACULTIES
+            if app.funding_tier_for_faculty(faculty) is None
+        ]
+        self.assertEqual(unassigned, [])
+
+    def test_low_funding_excludes_the_faculties_in_the_reported_bug(self):
+        rows = app.rank_faculties(self.strengths, self.cat_scores, "B1")
+        names = {row["name"] for row in rows}
+
+        self.assertIn("นิติศาสตร์", names)
+        self.assertNotIn("ทันตแพทยศาสตร์", names)
+        self.assertNotIn("ทัศนมาตรศาสตร์ (Optometry)", names)
+        self.assertNotIn("ธรณีวิทยา", names)
+        self.assertTrue(all(
+            app.funding_tier_for_faculty(row["_fac"]) == "B1" for row in rows
+        ))
+
+    def test_high_funding_contains_dentistry_and_excludes_low_cost_faculties(self):
+        rows = app.rank_faculties(self.strengths, self.cat_scores, "B3")
+        names = {row["name"] for row in rows}
+
+        self.assertIn("ทันตแพทยศาสตร์", names)
+        self.assertNotIn("นิติศาสตร์", names)
+        self.assertNotIn("วิศวกรรมเครื่องกล", names)
 
 
 class ZeroToFiveScaleTests(unittest.TestCase):

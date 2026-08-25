@@ -310,6 +310,85 @@ MBTI_TYPES = load_json("mbti_type_descriptions.json")
 BUDGET_TIERS = FACULTY_DB["budgetTiers"]
 FACULTIES = FACULTY_DB["facultyDatabase"]
 
+# เกณฑ์กลุ่มค่าเรียนจาก "จัดกลุ่มค่าเรียนแต่ละคณะ.docx".  กำหนด
+# รายคณะโดยตรง (แทนการเดาจากข้อความค่าเทอมหรือชื่อ group) เพื่อให้
+# การกรองผลลัพธ์เป็นเงื่อนไขจริง: คณะจะแสดงได้ก็ต่อเมื่องบที่เลือกตรงกัน.
+FACULTY_FUNDING_TIERS = {
+    # ระดับสูง
+    "แพทยศาสตร์": "B3",
+    "ทันตแพทยศาสตร์": "B3",
+    "เภสัชศาสตร์": "B3",
+    "สัตวแพทยศาสตร์": "B3",
+    "ดุริยางคศาสตร์ (ดนตรี)": "B3",
+    "ภาพยนตร์และสื่อดิจิทัล": "B3",
+    "UX/UI Design": "B3",
+    "Game Design": "B3",
+    "Computer Graphics/Digital Animation": "B3",
+
+    # ระดับปานกลาง
+    "วิศวกรรมคอมพิวเตอร์/ซอฟต์แวร์": "B2",
+    "วิทยาการคอมพิวเตอร์/IT": "B2",
+    "วิศวกรรมไฟฟ้า/อิเล็กทรอนิกส์": "B2",
+    "วิศวกรรมเครื่องกล": "B2",
+    "วิศวกรรมโยธา": "B2",
+    "วิศวกรรมเคมี": "B2",
+    "วิศวกรรมอุตสาหการ": "B2",
+    "วิศวกรรมการบิน/อวกาศ": "B2",
+    "วิทยาการข้อมูล (Data Science)": "B2",
+    "คณิตศาสตร์/สถิติประยุกต์": "B2",
+    "วิทยาศาสตร์ (ฟิสิกส์/เคมี)": "B2",
+    "วิทยาศาสตร์ (ชีววิทยา)": "B2",
+    "วิทยาศาสตร์สิ่งแวดล้อม": "B2",
+    "ธรณีวิทยา": "B2",
+    "เกษตรศาสตร์/อุตสาหกรรมเกษตร": "B2",
+    "สถาปัตยกรรมศาสตร์": "B2",
+    "พยาบาลศาสตร์": "B2",
+    "สหเวชศาสตร์/เทคนิคการแพทย์": "B2",
+    "สาธารณสุขศาสตร์": "B2",
+    "กายภาพบำบัด": "B2",
+    "วิทยาศาสตร์การกีฬา": "B2",
+    "แพทย์แผนไทยประยุกต์": "B2",
+    "ทัศนมาตรศาสตร์ (Optometry)": "B2",
+    "รังสีเทคนิค": "B2",
+    "วิจิตรศิลป์": "B2",
+    "ศิลปกรรมศาสตร์ (ออกแบบประยุกต์)": "B2",
+    "มัณฑนศิลป์/ออกแบบภายใน": "B2",
+    "นาฏศิลป์/การแสดง": "B2",
+    "ออกแบบนิเทศศิลป์ (Graphic Design)": "B2",
+    "แฟชั่นดีไซน์": "B2",
+    "จิตวิทยาคลินิก": "B2",
+    "คณิตศาสตร์ประกันภัย (Actuarial Science)": "B2",
+    "FinTech": "B2",
+    "ชีวสารสนเทศศาสตร์ (Bioinformatics)": "B2",
+
+    # ระดับต่ำ
+    "ประมง (Fisheries)": "B1",
+    "อักษรศาสตร์/ศิลปศาสตร์ (ภาษาต่างประเทศ)": "B1",
+    "ภาษาไทย/วรรณคดี": "B1",
+    "ประวัติศาสตร์": "B1",
+    "ปรัชญา": "B1",
+    "ครุศาสตร์/ศึกษาศาสตร์": "B1",
+    "บรรณารักษศาสตร์/สารสนเทศศาสตร์": "B1",
+    "ภาษาศาสตร์ (Linguistics)": "B1",
+    "รัฐศาสตร์ (การปกครอง)": "B1",
+    "นิติศาสตร์": "B1",
+    "เศรษฐศาสตร์": "B1",
+    "บริหารธุรกิจ": "B1",
+    "การบัญชี": "B1",
+    "นิเทศศาสตร์/วารสารศาสตร์": "B1",
+    "จิตวิทยา": "B1",
+    "สังคมสงเคราะห์ศาสตร์": "B1",
+    "สังคมวิทยาและมานุษยวิทยา": "B1",
+    "การท่องเที่ยวและการโรงแรม": "B1",
+    "รัฐประศาสนศาสตร์": "B1",
+    "การจัดการทรัพยากรมนุษย์": "B1",
+    "สังคมศาสตร์สิ่งแวดล้อม": "B1",
+    "นโยบายสาธารณสุข": "B1",
+    "ความสัมพันธ์ระหว่างประเทศ": "B1",
+    "นักการทูต": "B1",
+    "ธุรกิจ/การตลาดระหว่างประเทศ": "B1",
+}
+
 
 # ---------------------------------------------------------------- scoring core
 def strengths_from_type(type_code):
@@ -401,9 +480,20 @@ def build_reason(fac, strengths, cat_scores):
     return " · ".join(parts)
 
 
-def rank_faculties(strengths, cat_scores):
+def funding_tier_for_faculty(fac):
+    """Return the explicit funding tier for a faculty, or None if it is unknown."""
+    return FACULTY_FUNDING_TIERS.get(fac["name"])
+
+
+def rank_faculties(strengths, cat_scores, budget_tier=None):
+    """Rank only faculties whose explicit funding tier matches the user's budget."""
+    if budget_tier is not None and budget_tier not in BUDGET_TIERS:
+        raise ValueError(f"Unknown budget tier: {budget_tier}")
+
     rows = []
     for fac in FACULTIES:
+        if budget_tier is not None and funding_tier_for_faculty(fac) != budget_tier:
+            continue
         ms = mbti_score(fac, strengths)
         ss = subj_score(fac, cat_scores)
         ms_uncapped = mbti_score_uncapped(fac, strengths)
@@ -812,7 +902,7 @@ def page_results():
     strengths = st.session_state["function_strengths"]
     cat_scores = st.session_state["cat_scores"]
     budget = st.session_state.get("budget_tier")
-    rows = rank_faculties(strengths, cat_scores)
+    rows = rank_faculties(strengths, cat_scores, budget)
     top10 = rows[:10]
     tier_desc = BUDGET_TIERS[budget]["label"]
 
@@ -820,22 +910,25 @@ def page_results():
     st.success(f"MBTI: **{st.session_state['derived_type']}** · "
                f"งบ: **{budget} ({tier_desc})**")
 
-    # คณะที่ Match สูงสุด 3 อันดับ แสดงก่อนตาราง
-    medals = ["🥇", "🥈", "🥉"]
-    for i, r in enumerate(top10[:3], start=1):
-        fac = r["_fac"]
-        with st.expander(f"{medals[i - 1]} #{i} {r['name']} — Match {r['match']}%"):
-            st.write("**ฟังก์ชันที่ต้องการ:** "
-                     + ", ".join(fac["functions"]) + f" (scope: {fac['scope']})")
-            st.write("**เงื่อนไขความชอบ:** "
-                     + "; ".join(f"{c['cat']} ≥ {c['min']}" for c in fac["conditions"]))
-            for k in tier_keys_all():
-                b = fac["budget"].get(k, "-")
-                t = BUDGET_TIERS[k]
-                st.write(f"- **{k} ({t['label']})**: {b}")
+    if top10:
+        # คณะที่ Match สูงสุด 3 อันดับ แสดงก่อนตาราง
+        medals = ["🥇", "🥈", "🥉"]
+        for i, r in enumerate(top10[:3], start=1):
+            fac = r["_fac"]
+            with st.expander(f"{medals[i - 1]} #{i} {r['name']} — Match {r['match']}%"):
+                st.write("**ฟังก์ชันที่ต้องการ:** "
+                         + ", ".join(fac["functions"]) + f" (scope: {fac['scope']})")
+                st.write("**เงื่อนไขความชอบ:** "
+                         + "; ".join(f"{c['cat']} ≥ {c['min']}" for c in fac["conditions"]))
+                for k in tier_keys_all():
+                    b = fac["budget"].get(k, "-")
+                    t = BUDGET_TIERS[k]
+                    st.write(f"- **{k} ({t['label']})**: {b}")
 
-    st.subheader("คณะแนะนำ 10 อันดับแรก")
-    render_rank_table(top10, budget)
+        st.subheader("คณะแนะนำ 10 อันดับแรก")
+        render_rank_table(top10, budget)
+    else:
+        st.warning("ไม่พบคณะที่ตรงกับระดับเงินทุนที่เลือก")
 
     st.divider()
     st.subheader("บันทึกผลลัพธ์")
