@@ -303,7 +303,24 @@ def mbti_score(fac, strengths):
 
 
 def subj_score(fac, cat_scores):
+    """Score shown to users: each condition ratio is capped at 100%."""
     ratios = [min(cat_scores[c["cat"]] / c["min"] * 100, 100)
+              for c in fac["conditions"]]
+    return min(ratios)
+
+
+def mbti_score_uncapped(fac, strengths):
+    """Ranking-only MBTI score.
+
+    Function strengths already lie in the 0–100 range, so the display score is
+    also the uncapped score.
+    """
+    return mbti_score(fac, strengths)
+
+
+def subj_score_uncapped(fac, cat_scores):
+    """Ranking-only subject score: preserve how far a score exceeds the threshold."""
+    ratios = [cat_scores[c["cat"]] / c["min"] * 100
               for c in fac["conditions"]]
     return min(ratios)
 
@@ -326,18 +343,22 @@ def rank_faculties(strengths, cat_scores):
     for fac in FACULTIES:
         ms = mbti_score(fac, strengths)
         ss = subj_score(fac, cat_scores)
+        ms_uncapped = mbti_score_uncapped(fac, strengths)
+        ss_uncapped = subj_score_uncapped(fac, cat_scores)
         match = round(0.3 * ms + 0.7 * ss, 1)
+        sort_score = 0.3 * ms_uncapped + 0.7 * ss_uncapped
         rows.append({
             "name": fac["name"],
             "group": fac["group"],
             "mbtiScore": round(ms, 1),
             "subjScore": round(ss, 1),
             "match": match,
+            "sortScore": sort_score,
             "reason": build_reason(fac, strengths, cat_scores),
             "uni": fac["budget"].get(st.session_state.get("budget_tier"), "-"),
             "_fac": fac,
         })
-    rows.sort(key=lambda r: (-r["match"], -r["subjScore"], r["name"]))
+    rows.sort(key=lambda r: (-r["sortScore"], r["name"]))
     return rows
 
 
