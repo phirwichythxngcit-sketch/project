@@ -107,7 +107,8 @@ input:focus,[data-baseweb="select"]>div:focus-within{
     transform:translateY(-2px);background:color-mix(in srgb,var(--score-color) 12%,white);}
 [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:has(input:checked){
     background:var(--score-color);color:#fff;box-shadow:0 3px 9px color-mix(in srgb,var(--score-color) 35%,transparent);}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label > div:first-child{display:none;}
+[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label > div:first-child{
+    position:absolute;opacity:0;pointer-events:none;}
 [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label p{margin:0;color:inherit;font:inherit;}
 [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(1){--score-color:#9CA3AF;}
 [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(2){--score-color:#E74C3C;}
