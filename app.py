@@ -149,15 +149,12 @@ input:focus,[data-baseweb="select"]>div:focus-within{
     border-color:#5B7B6F !important;transform:translateY(-1px);}
 [class*="st-key-score_"][class*="_option_0"] button[kind="primary"]{
     background:#8A8175 !important;border:3px solid #8A8175 !important;color:#fff !important;}
-[class*="st-key-score_"][class*="_option_1"] button[kind="primary"]{
-    background:#A89C8C !important;border:3px solid #A89C8C !important;color:#fff !important;}
+[class*="st-key-score_"][class*="_option_1"] button[kind="primary"],
 [class*="st-key-score_"][class*="_option_2"] button[kind="primary"],
-[class*="st-key-score_"][class*="_option_3"] button[kind="primary"]{
-    background:#5B7B6F !important;border:3px solid #5B7B6F !important;color:#fff !important;}
-[class*="st-key-score_"][class*="_option_4"] button[kind="primary"]{
-    background:#9E7A37 !important;border:3px solid #9E7A37 !important;color:#fff !important;}
+[class*="st-key-score_"][class*="_option_3"] button[kind="primary"],
+[class*="st-key-score_"][class*="_option_4"] button[kind="primary"],
 [class*="st-key-score_"][class*="_option_5"] button[kind="primary"]{
-    background:#C9962F !important;border:3px solid #C9962F !important;color:#fff !important;}
+    background:#20A464 !important;border:3px solid #20A464 !important;color:#fff !important;}
 [class*="st-key-score_"][class*="_option_"] button[kind="primary"]{
     transform:scale(1.15);box-shadow:0 4px 12px rgba(91,123,111,.25) !important;}
 @media (max-width: 640px){
