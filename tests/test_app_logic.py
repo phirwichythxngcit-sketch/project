@@ -219,7 +219,7 @@ class ZeroToFiveScaleTests(unittest.TestCase):
         )
 
     def test_zero_to_five_scale_has_six_ordered_choices(self):
-        self.assertEqual(app.SCALE_0_5, ["0", "1", "2", "3", "4", "5"])
+        self.assertEqual(app.SCALE_0_5, ["5", "4", "3", "2", "1", "0"])
 
 
 if __name__ == "__main__":
