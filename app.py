@@ -487,14 +487,42 @@ def funding_tier_for_faculty(fac):
     return FACULTY_FUNDING_TIERS.get(fac["name"])
 
 
+FUNDING_TIER_ORDER = ("B1", "B2", "B3")
+
+
+def affordable_funding_tiers(budget_tier):
+    """Return the selected tier and every lower tier, highest one first."""
+    if budget_tier not in FUNDING_TIER_ORDER:
+        raise ValueError(f"Unknown budget tier: {budget_tier}")
+    selected_index = FUNDING_TIER_ORDER.index(budget_tier)
+    return tuple(reversed(FUNDING_TIER_ORDER[:selected_index + 1]))
+
+
+def order_rows_by_funding_tier(rows, budget_tier):
+    """Group affordable results from the highest affordable tier to the lowest.
+
+    Python's stable sort preserves the existing Match% / sortScore order within
+    every funding group, so this does not change the ranking tie-break rule.
+    """
+    tier_priority = {tier: index for index, tier in enumerate(
+        affordable_funding_tiers(budget_tier)
+    )}
+    return sorted(rows, key=lambda row: tier_priority[
+        funding_tier_for_faculty(row["_fac"])
+    ])
+
+
 def rank_faculties(strengths, cat_scores, budget_tier=None):
-    """Rank only faculties whose explicit funding tier matches the user's budget."""
+    """Rank faculties that do not exceed the user's selected funding tier."""
     if budget_tier is not None and budget_tier not in BUDGET_TIERS:
         raise ValueError(f"Unknown budget tier: {budget_tier}")
 
+    affordable_tiers = (affordable_funding_tiers(budget_tier)
+                         if budget_tier is not None else None)
     rows = []
     for fac in FACULTIES:
-        if budget_tier is not None and funding_tier_for_faculty(fac) != budget_tier:
+        if (affordable_tiers is not None
+                and funding_tier_for_faculty(fac) not in affordable_tiers):
             continue
         ms = mbti_score(fac, strengths)
         ss = subj_score(fac, cat_scores)
@@ -904,6 +932,7 @@ def page_results():
     cat_scores = st.session_state["cat_scores"]
     budget = st.session_state.get("budget_tier")
     rows = rank_faculties(strengths, cat_scores, budget)
+    rows = order_rows_by_funding_tier(rows, budget)
     top10 = rows[:10]
     tier_desc = BUDGET_TIERS[budget]["label"]
 

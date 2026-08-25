@@ -235,13 +235,36 @@ class FundingTierFilteringTests(unittest.TestCase):
             app.funding_tier_for_faculty(row["_fac"]) == "B1" for row in rows
         ))
 
-    def test_high_funding_contains_dentistry_and_excludes_low_cost_faculties(self):
+    def test_high_funding_includes_every_affordable_tier(self):
         rows = app.rank_faculties(self.strengths, self.cat_scores, "B3")
         names = {row["name"] for row in rows}
 
         self.assertIn("ทันตแพทยศาสตร์", names)
-        self.assertNotIn("นิติศาสตร์", names)
-        self.assertNotIn("วิศวกรรมเครื่องกล", names)
+        self.assertIn("วิศวกรรมเครื่องกล", names)
+        self.assertIn("นิติศาสตร์", names)
+
+    def test_medium_funding_includes_medium_and_low_but_not_high(self):
+        rows = app.rank_faculties(self.strengths, self.cat_scores, "B2")
+        names = {row["name"] for row in rows}
+
+        self.assertIn("วิศวกรรมเครื่องกล", names)
+        self.assertIn("นิติศาสตร์", names)
+        self.assertNotIn("ทันตแพทยศาสตร์", names)
+
+    def test_display_orders_affordable_tiers_highest_first(self):
+        rows = app.rank_faculties(self.strengths, self.cat_scores, "B3")
+        displayed = app.order_rows_by_funding_tier(rows, "B3")
+        tiers = [app.funding_tier_for_faculty(row["_fac"]) for row in displayed]
+
+        self.assertEqual(tiers, sorted(tiers, reverse=True))
+        for tier in app.affordable_funding_tiers("B3"):
+            tier_rows = [row for row in displayed
+                         if app.funding_tier_for_faculty(row["_fac"]) == tier]
+            self.assertEqual(
+                tier_rows,
+                sorted(tier_rows, key=lambda row: (
+                    -row["match"], -row["sortScore"], row["name"])),
+            )
 
 
 class RankTableTieBreakDisplayTests(unittest.TestCase):
