@@ -72,6 +72,27 @@ h1,h2,h3,h4,h5,.stMarkdown h1,.stMarkdown h2,.stMarkdown h3,.stMarkdown h4,
 [data-testid="stExpander"] summary{
     font-family:'Prompt','Sarabun',sans-serif;}
 h1,h2{letter-spacing:.005em}
+
+/* ---------- long Thai application title ---------- */
+h1,.stMarkdown h1{
+    font-size:clamp(2rem,3.4vw,3.25rem);
+    line-height:1.28;
+    max-width:22ch;
+    margin-bottom:.7rem;
+}
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] .stMarkdown h2{
+    font-size:1.08rem;
+    line-height:1.5;
+    letter-spacing:0;
+    overflow-wrap:anywhere;
+    margin:0 0 .8rem;
+}
+@media (max-width: 640px){
+    h1,.stMarkdown h1{font-size:1.85rem;line-height:1.35;}
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] .stMarkdown h2{font-size:1rem;}
+}
 [data-testid="stHeader"]{background:transparent}
 
 /* ---------- layout rhythm ---------- */
