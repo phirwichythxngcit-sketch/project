@@ -1002,8 +1002,7 @@ def render_rank_table(rows):
         'ระบบเรียงต่อด้วยคะแนนจัดอันดับนี้ (ไม่ปัดเศษ) แล้วจึงเรียงตามชื่อคณะ '
         'ก-ฮ เป็นลำดับสุดท้าย" aria-label="คำอธิบายการจัดอันดับ">ⓘ</span>'
     )
-    head_cols = ["อันดับ", "คณะ/สาขา", match_header, "MBTI Score", "Subj Score",
-                 "เหตุผล"]
+    head_cols = ["อันดับ", "คณะ/สาขา", match_header, "MBTI Score", "Subj Score"]
     head = "".join(f"<th>{c}</th>" for c in head_cols)
     body = []
     for i, r in enumerate(rows):
@@ -1024,7 +1023,6 @@ def render_rank_table(rows):
             f'<div class="matchbar"><i style="width:{pct}%"></i></div></td>',
             f'<td>{r["mbtiScore"]}</td>',
             f'<td>{r["subjScore"]}</td>',
-            f'<td style="max-width:280px">{html.escape(r["reason"])}</td>',
         ]
         body.append(f'<tr class="{cls}">' + "".join(cells) + "</tr>")
     st.markdown(

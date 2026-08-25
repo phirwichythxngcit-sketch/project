@@ -301,6 +301,7 @@ class RankTableSortScoreDisplayTests(unittest.TestCase):
             self.assertIn(f"คะแนนจัดอันดับ: {round(expected['sortScore'], 1)}", row)
         self.assertNotIn("จัดลำดับย่อยจากคะแนนละเอียดกว่า", rendered[0])
         self.assertIn("เมื่อ Match % เท่ากัน", rendered[0])
+        self.assertNotIn("เหตุผล", rendered[0])
 
 
 class ZeroToFiveScaleTests(unittest.TestCase):
