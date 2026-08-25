@@ -1,4 +1,5 @@
 import importlib.util
+import re
 import sys
 import types
 import unittest
@@ -241,6 +242,45 @@ class FundingTierFilteringTests(unittest.TestCase):
         self.assertIn("ทันตแพทยศาสตร์", names)
         self.assertNotIn("นิติศาสตร์", names)
         self.assertNotIn("วิศวกรรมเครื่องกล", names)
+
+
+class RankTableTieBreakDisplayTests(unittest.TestCase):
+    def setUp(self):
+        self.rows = [
+            {"name": "ก", "match": 100.0, "mbtiScore": 100, "subjScore": 100,
+             "reason": "-"},
+            {"name": "ข", "match": 100.0, "mbtiScore": 100, "subjScore": 100,
+             "reason": "-"},
+            {"name": "ค", "match": 90.0, "mbtiScore": 90, "subjScore": 90,
+             "reason": "-"},
+            {"name": "ง", "match": 80.0, "mbtiScore": 80, "subjScore": 80,
+             "reason": "-"},
+            {"name": "จ", "match": 80.0, "mbtiScore": 80, "subjScore": 80,
+             "reason": "-"},
+        ]
+
+    def test_tie_break_note_is_limited_to_rows_with_an_adjacent_match(self):
+        self.assertEqual(
+            [app.has_adjacent_match_tie(self.rows, i) for i in range(len(self.rows))],
+            [True, True, False, True, True],
+        )
+
+    def test_rendered_note_appears_only_for_tied_rows(self):
+        rendered = []
+        previous_markdown = getattr(app.st, "markdown", None)
+        app.st.markdown = lambda text, **_kwargs: rendered.append(text)
+        try:
+            app.render_rank_table(self.rows)
+        finally:
+            if previous_markdown is None:
+                del app.st.markdown
+            else:
+                app.st.markdown = previous_markdown
+
+        body_rows = re.findall(r'<tr[^>]*>(.*?)</tr>', rendered[0])
+        note = "จัดลำดับย่อยจากคะแนนละเอียดกว่า"
+        self.assertEqual(sum(note in row for row in body_rows), 4)
+        self.assertFalse(note in next(row for row in body_rows if "<b>ค</b>" in row))
 
 
 class ZeroToFiveScaleTests(unittest.TestCase):
