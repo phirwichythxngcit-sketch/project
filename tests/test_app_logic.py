@@ -93,5 +93,49 @@ class InterestQuestionParsingTests(unittest.TestCase):
         )
 
 
+class FacultyRankingTests(unittest.TestCase):
+    def setUp(self):
+        self.original_faculties = app.FACULTIES
+        app.FACULTIES = [
+            {
+                "name": "ก คณะที่เกินเกณฑ์น้อยกว่า",
+                "group": "ทดสอบ",
+                "functions": ["Ti"],
+                "conditions": [{"cat": "M", "min": 50}],
+                "budget": {},
+            },
+            {
+                "name": "ฮ คณะที่เกินเกณฑ์มากกว่า",
+                "group": "ทดสอบ",
+                "functions": ["Ti"],
+                "conditions": [{"cat": "M", "min": 20}],
+                "budget": {},
+            },
+        ]
+        self.strengths = {"Ti": 100, "Te": 0, "Fe": 0, "Fi": 0,
+                          "Se": 0, "Si": 0, "Ne": 0, "Ni": 0}
+        self.cat_scores = {"M": 100, "S": 0, "L": 0, "H": 0, "A": 0}
+
+    def tearDown(self):
+        app.FACULTIES = self.original_faculties
+
+    def test_display_score_stays_capped_while_ranking_uses_uncapped_score(self):
+        rows = app.rank_faculties(self.strengths, self.cat_scores)
+
+        self.assertEqual([row["match"] for row in rows], [100.0, 100.0])
+        self.assertEqual(rows[0]["name"], "ฮ คณะที่เกินเกณฑ์มากกว่า")
+        self.assertGreater(rows[0]["sortScore"], rows[1]["sortScore"])
+
+    def test_equal_sort_scores_are_ordered_by_faculty_name(self):
+        app.FACULTIES[1]["conditions"] = [{"cat": "M", "min": 50}]
+
+        rows = app.rank_faculties(self.strengths, self.cat_scores)
+
+        self.assertEqual(
+            [row["name"] for row in rows],
+            ["ก คณะที่เกินเกณฑ์น้อยกว่า", "ฮ คณะที่เกินเกณฑ์มากกว่า"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
