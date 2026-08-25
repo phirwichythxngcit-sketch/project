@@ -943,7 +943,7 @@ def render_history():
 
 # ---------------------------------------------------------------- main
 def main():
-    st.set_page_config(page_title="แนะแนวคณะ", page_icon="🎓", layout="wide")
+    st.set_page_config(page_title="วางแผนการศึกษาต่อในระดับอุดมศึกษาของนักเรียนโรงเรียนสองพิทยาคม", page_icon="🎓", layout="wide")
     inject_css()
     init_session()
 
@@ -952,7 +952,7 @@ def main():
     survey = parse_interest_questions(interest_file.stat().st_mtime_ns)
 
     with st.sidebar:
-        st.header("แบบสอบถามแนะแนวคณะ")
+        st.header("วางแผนการศึกษาต่อในระดับอุดมศึกษาของนักเรียนโรงเรียนสองพิทยาคม")
         done_flags = [
             ("1. เริ่มต้น", bool(st.session_state["name"])),
             ("2. ผล MBTI", st.session_state["function_strengths"] is not None),
