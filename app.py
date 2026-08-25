@@ -46,8 +46,11 @@ CAT_TH = {
 SELF_STRENGTH = [100, 70, 35, 10]  # Dom -> Aux -> Tert -> Inf
 STACK_WEIGHTS = [0.4, 0.3, 0.2, 0.1]
 MAX_STACK_SCORE = sum(STACK_WEIGHTS)
-SCALE_0_5 = [str(i) for i in range(5, -1, -1)]
-SCALE_HELP = "0 = ไม่ใช่เลย · 1 = น้อยมาก · 2 = น้อย · 3 = ปานกลาง · 4 = มาก · 5 = มากที่สุด"
+SCALE_0_5 = [str(i) for i in range(6)]
+SCALE_LABELS = {
+    0: "ไม่เห็นด้วยอย่างยิ่ง", 1: "ไม่เห็นด้วย", 2: "ค่อนข้างไม่เห็นด้วย",
+    3: "ค่อนข้างเห็นด้วย", 4: "เห็นด้วย", 5: "เห็นด้วยอย่างยิ่ง",
+}
 DISCLAIMER = ("นี่คือผลโดยประมาณเพื่อการสำรวจตนเอง "
               "ไม่ใช่ผลวินิจฉัยที่ตายตัว")
 
@@ -94,43 +97,37 @@ input:focus,[data-baseweb="select"]>div:focus-within{
     border-color:var(--teal) !important;
     box-shadow:0 0 0 3px rgba(15,118,110,.15) !important;}
 
-/* ---------- score radio: เห็นด้วย ← → ไม่เห็นด้วย ---------- */
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)){
-    display:flex;flex-direction:row;align-items:center;flex-wrap:nowrap;gap:.7rem;
-    min-height:92px;padding:.25rem 0 .55rem;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6))::before,
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6))::after{
-    font-family:'Prompt','Sarabun',sans-serif;font-size:1.05rem;font-weight:600;
-    white-space:nowrap;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6))::before{
-    content:"ฉันเห็นด้วย";color:#20A464;margin-right:.65rem;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6))::after{
-    content:"ฉันไม่เห็นด้วย";color:#85609D;margin-left:.65rem;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label{
-    --score-color:#20A464;width:80px;height:80px;padding:0;margin:0;flex:0 0 auto;
-    border:2.5px solid var(--score-color);border-radius:999px;background:#fff;
-    display:flex;align-items:center;justify-content:center;
-    transition:transform .12s ease,background .12s ease,box-shadow .12s ease;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:hover{
-    transform:translateY(-2px);background:color-mix(in srgb,var(--score-color) 10%,white);}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:has(input:checked){
-    background:var(--score-color);box-shadow:0 3px 9px color-mix(in srgb,var(--score-color) 32%,transparent);}
-/* ซ่อน radio และตัวเลข: วงกลมทั้งวงยังคลิกเลือกคำตอบได้ */
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label [data-baseweb="radio"],
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label input[type="radio"],
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label p{
-    display:none !important;}
-/* SCALE_0_5 เรียง 5 → 0: เห็นด้วย (เขียว) → กลาง (เทา) → ไม่เห็นด้วย (ม่วง) */
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(1){--score-color:#20A464;width:80px;height:80px;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(2){--score-color:#20A464;width:64px;height:64px;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(3){--score-color:#20A464;width:52px;height:52px;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(4){--score-color:#9CA3AF;width:42px;height:42px;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(5){--score-color:#85609D;width:64px;height:64px;}
-[data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)) > label:nth-child(6){--score-color:#85609D;width:80px;height:80px;}
-@media (max-width: 760px){
-    [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6)){flex-wrap:wrap;gap:.5rem;}
-    [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6))::before,
-    [data-testid="stRadio"] [role="radiogroup"]:has(> label:nth-child(6))::after{font-size:.9rem;margin:0;}
+/* ---------- agreement scale: custom 0–5 circle buttons ---------- */
+.agreement-question{font-weight:600;margin:.95rem 0 .3rem;}
+.agreement-labels{display:flex;justify-content:space-between;gap:1rem;
+    margin:.15rem 0 .4rem;color:#5B7B6F;font-size:.84rem;font-weight:600;}
+.agreement-labels span:last-child{color:#C9962F;text-align:right;}
+[class*="st-key-score_"][class*="_option_"] button{
+    width:52px !important;height:52px !important;min-height:52px !important;
+    padding:0 !important;border-radius:999px !important;background:#fff !important;
+    border:1.5px solid #D9D2C2 !important;color:#5F5A52 !important;
+    font-family:'IBM Plex Mono','Sarabun',monospace !important;font-weight:700 !important;
+    font-size:1rem !important;transition:transform .14s ease,background .14s ease,
+    border-color .14s ease,box-shadow .14s ease !important;}
+[class*="st-key-score_"][class*="_option_"] button:hover{
+    border-color:#5B7B6F !important;transform:translateY(-1px);}
+[class*="st-key-score_"][class*="_option_0"] button[kind="primary"]{
+    background:#8A8175 !important;border:3px solid #8A8175 !important;color:#fff !important;}
+[class*="st-key-score_"][class*="_option_1"] button[kind="primary"]{
+    background:#A89C8C !important;border:3px solid #A89C8C !important;color:#fff !important;}
+[class*="st-key-score_"][class*="_option_2"] button[kind="primary"],
+[class*="st-key-score_"][class*="_option_3"] button[kind="primary"]{
+    background:#5B7B6F !important;border:3px solid #5B7B6F !important;color:#fff !important;}
+[class*="st-key-score_"][class*="_option_4"] button[kind="primary"]{
+    background:#9E7A37 !important;border:3px solid #9E7A37 !important;color:#fff !important;}
+[class*="st-key-score_"][class*="_option_5"] button[kind="primary"]{
+    background:#C9962F !important;border:3px solid #C9962F !important;color:#fff !important;}
+[class*="st-key-score_"][class*="_option_"] button[kind="primary"]{
+    transform:scale(1.15);box-shadow:0 4px 12px rgba(91,123,111,.25) !important;}
+@media (max-width: 640px){
+    [class*="st-key-score_"][class*="_option_"] button{
+        width:46px !important;height:46px !important;min-height:46px !important;}
+    .agreement-labels{font-size:.76rem;}
 }
 
 /* ---------- progress ---------- */
@@ -528,6 +525,31 @@ def saved_answer_at(answers, index):
     return None
 
 
+def render_agreement_selector(question, key, default=None):
+    """Render the 0–5 forced-choice agreement control and return None or 0–5."""
+    state_key = f"score_{key}"
+    if state_key not in st.session_state and default in SCALE_LABELS:
+        st.session_state[state_key] = default
+
+    st.markdown(f'<div class="agreement-question">{html.escape(question)}</div>',
+                unsafe_allow_html=True)
+    st.markdown(
+        '<div class="agreement-labels"><span>ไม่เห็นด้วยอย่างยิ่ง</span>'
+        '<span>เห็นด้วยอย่างยิ่ง</span></div>',
+        unsafe_allow_html=True,
+    )
+    cols = st.columns(6)
+    for score, col in enumerate(cols):
+        selected = st.session_state.get(state_key) == score
+        with col:
+            if st.button(str(score), key=f"{state_key}_option_{score}",
+                         type="primary" if selected else "secondary",
+                         help=SCALE_LABELS[score], use_container_width=True):
+                st.session_state[state_key] = score
+                st.rerun()
+    return st.session_state.get(state_key)
+
+
 def admin_password():
     """Return the configured Streamlit Secrets password, if one exists."""
     try:
@@ -627,8 +649,7 @@ def page_function_test(fn_questions):
     unanswered = []
     for i, q in enumerate(fn_questions[func]):
         key = f"ans_{func}_{i}"
-        val = st.radio(f"{idx * 10 + i + 1}. {q}", SCALE_0_5, index=None,
-                       key=key, horizontal=True)
+        val = render_agreement_selector(f"{idx * 10 + i + 1}. {q}", key)
         if val is None:
             unanswered.append(idx * 10 + i + 1)
 
@@ -645,7 +666,7 @@ def page_function_test(fn_questions):
                            "(ข้อที่ยังไม่ได้ตอบ: "
                            + ", ".join(map(str, unanswered)) + ")")
             else:
-                raw = sum(int(st.session_state[f"ans_{func}_{i}"][0]) for i in range(10))
+                raw = sum(st.session_state[f"score_ans_{func}_{i}"] for i in range(10))
                 st.session_state["func_raw"][func] = raw
                 if idx == 7:
                     st.session_state["function_strengths"] = \
@@ -698,16 +719,14 @@ def page_interest_survey(survey):
     st.progress(len(st.session_state["interest_answers"]) / 5,
                 text=f"หมวดที่ {len(st.session_state['interest_answers'])}/5 เสร็จสิ้น")
     st.header(f"หมวด {idx + 1}/5: {block['title']}")
-    st.caption(f"ให้คะแนนแต่ละข้อ 0–5 · {SCALE_HELP}")
+    st.caption("เลือกคำตอบที่ใกล้กับความเห็นของคุณที่สุด (0–5)")
 
     answers = st.session_state["interest_answers"].get(cat, {})
     unanswered = []
     for i, q in enumerate(block["questions"]):
         key = f"in_{cat}_{i}"
         default = saved_answer_at(answers, i)
-        d_idx = SCALE_0_5.index(str(default)) if isinstance(default, int) and 0 <= default <= 5 else None
-        val = st.radio(f"{i + 1}. {q}", SCALE_0_5, index=d_idx, key=key,
-                       horizontal=True)
+        val = render_agreement_selector(f"{i + 1}. {q}", key, default)
         if val is None:
             unanswered.append(i + 1)
 
@@ -724,7 +743,7 @@ def page_interest_survey(survey):
                            "(ข้อที่ยังไม่ได้ตอบ: "
                            + ", ".join(map(str, unanswered)) + ")")
             else:
-                vals = [int(st.session_state[f"in_{cat}_{i}"][0]) for i in range(20)]
+                vals = [st.session_state[f"score_in_{cat}_{i}"] for i in range(20)]
                 st.session_state["interest_answers"][cat] = vals
                 if idx == 4:
                     st.session_state["cat_scores"] = {
