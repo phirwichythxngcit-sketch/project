@@ -358,7 +358,10 @@ def rank_faculties(strengths, cat_scores):
             "uni": fac["budget"].get(st.session_state.get("budget_tier"), "-"),
             "_fac": fac,
         })
-    rows.sort(key=lambda r: (-r["sortScore"], r["name"]))
+    # Keep the table in descending order of the Match% shown to users.
+    # sortScore resolves only equal displayed percentages, then name resolves
+    # exact ties deterministically.
+    rows.sort(key=lambda r: (-r["match"], -r["sortScore"], r["name"]))
     return rows
 
 
@@ -439,8 +442,9 @@ def pie_categories(cat_scores):
     return _style_pie(fig, "ความชอบ 5 หมวด (M, S, L, H, A)")
 
 
-def pie_top_faculties(rows):
-    top = rows[:5]
+def pie_top_faculties(top10_rows):
+    """Build the faculty chart from the same sorted top-10 data as the table."""
+    top = top10_rows[:5]
     fig = px.pie(names=[f"{r['name']} ({r['match']}%)" for r in top],
                  values=[r["match"] for r in top],
                  color_discrete_sequence=PIE_COLORS)
@@ -719,6 +723,7 @@ def page_results():
     cat_scores = st.session_state["cat_scores"]
     budget = st.session_state.get("budget_tier")
     rows = rank_faculties(strengths, cat_scores)
+    top10 = rows[:10]
     tier_desc = BUDGET_TIERS[budget]["label"]
 
     st.header(f"ผลลัพธ์ของ{name_suffix()}")
@@ -727,7 +732,7 @@ def page_results():
 
     # คณะที่ Match สูงสุด 3 อันดับ แสดงก่อนตาราง
     medals = ["🥇", "🥈", "🥉"]
-    for i, r in enumerate(rows[:3], start=1):
+    for i, r in enumerate(top10[:3], start=1):
         fac = r["_fac"]
         with st.expander(f"{medals[i - 1]} #{i} {r['name']} — Match {r['match']}%"):
             st.write("**ฟังก์ชันที่ต้องการ:** "
@@ -740,7 +745,7 @@ def page_results():
                 st.write(f"- **{k} ({t['label']})**: {b}")
 
     st.subheader("คณะแนะนำ 10 อันดับแรก")
-    render_rank_table(rows, budget)
+    render_rank_table(top10, budget)
 
     st.divider()
     st.subheader("บันทึกผลลัพธ์")
@@ -758,7 +763,7 @@ def page_results():
                 **{c: int(cat_scores[c]) for c in CAT_ORDER},
                 "budget": budget,
                 "top_faculties": " | ".join(
-                    f"{i}. {r['name']} ({r['match']}%)" for i, r in enumerate(rows[:3], 1)),
+                    f"{i}. {r['name']} ({r['match']}%)" for i, r in enumerate(top10[:3], 1)),
             }
             try:
                 st.session_state["saved_id"] = save_result(payload)
@@ -788,7 +793,7 @@ def render_rank_table(rows, budget):
                  "เหตุผล", f"ตัวอย่างมหาวิทยาลัย ({budget})"]
     head = "".join(f"<th>{c}</th>" for c in head_cols)
     body = []
-    for i, r in enumerate(rows[:10]):
+    for i, r in enumerate(rows):
         cls = ("rank1 top" if i == 0 else "rank2 top" if i == 1
                else "rank3 top" if i == 2 else "")
         badge_cls = f"b{i + 1}" if i < 3 else "bn"

@@ -137,5 +137,71 @@ class FacultyRankingTests(unittest.TestCase):
         )
 
 
+    def test_display_match_percentage_is_the_primary_ranking_order(self):
+        app.FACULTIES = [
+            {
+                "name": "ก Match 100 แต้มรอง",
+                "group": "ทดสอบ",
+                "functions": ["Ti"],
+                "conditions": [{"cat": "M", "min": 100}],
+                "budget": {},
+            },
+            {
+                "name": "ข Match 91 แต่เกินเกณฑ์มาก",
+                "group": "ทดสอบ",
+                "functions": ["Te"],
+                "conditions": [{"cat": "M", "min": 20}],
+                "budget": {},
+            },
+            {
+                "name": "ค Match 100 แต้มรองสูง",
+                "group": "ทดสอบ",
+                "functions": ["Ti"],
+                "conditions": [{"cat": "M", "min": 20}],
+                "budget": {},
+            },
+        ]
+        strengths = {"Ti": 100, "Te": 70, "Fe": 0, "Fi": 0,
+                     "Se": 0, "Si": 0, "Ne": 0, "Ni": 0}
+        cat_scores = {"M": 100, "S": 0, "L": 0, "H": 0, "A": 0}
+
+        rows = app.rank_faculties(strengths, cat_scores)
+
+        self.assertEqual([row["match"] for row in rows], [100.0, 100.0, 91.0])
+        self.assertEqual(
+            [row["name"] for row in rows],
+            ["ค Match 100 แต้มรองสูง", "ก Match 100 แต้มรอง",
+             "ข Match 91 แต่เกินเกณฑ์มาก"],
+        )
+
+    def test_real_faculty_rankings_are_non_increasing_by_display_match(self):
+        sample_profiles = [
+            ({"Ti": 100, "Te": 70, "Fe": 40, "Fi": 30,
+              "Se": 60, "Si": 50, "Ne": 80, "Ni": 20},
+             {"M": 100, "S": 100, "L": 100, "H": 100, "A": 100}),
+            ({"Ti": 35, "Te": 95, "Fe": 55, "Fi": 45,
+              "Se": 75, "Si": 65, "Ne": 85, "Ni": 25},
+             {"M": 75, "S": 90, "L": 65, "H": 80, "A": 70}),
+            ({"Ti": 60, "Te": 40, "Fe": 90, "Fi": 80,
+              "Se": 30, "Si": 50, "Ne": 70, "Ni": 100},
+             {"M": 55, "S": 60, "L": 95, "H": 100, "A": 85}),
+        ]
+
+        for strengths, cat_scores in sample_profiles:
+            with self.subTest(strengths=strengths, cat_scores=cat_scores):
+                rows = app.rank_faculties(strengths, cat_scores)
+                self.assertEqual(len(rows), len(app.FACULTIES))
+                self.assertEqual(
+                    rows,
+                    sorted(rows, key=lambda row: (
+                        -row["match"], -row["sortScore"], row["name"])),
+                )
+                self.assertEqual(
+                    rows[:10],
+                    sorted(rows[:10], key=lambda row: (
+                        -row["match"], -row["sortScore"], row["name"])),
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
