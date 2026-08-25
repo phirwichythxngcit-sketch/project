@@ -472,6 +472,11 @@ def subj_score_uncapped(fac, cat_scores):
     return min(ratios)
 
 
+def has_no_interest_preference(cat_scores):
+    """Return True only when all five interest-category totals are zero."""
+    return all(cat_scores.get(category, 0) == 0 for category in CAT_ORDER)
+
+
 def build_reason(fac, strengths, cat_scores):
     parts = []
     fn_pairs = sorted(((f, round(strengths[f])) for f in fac["functions"]),
@@ -942,6 +947,9 @@ def page_results():
     st.header(f"ผลลัพธ์ของ{name_suffix()}")
     st.success(f"MBTI: **{st.session_state['derived_type']}** · "
                f"งบ: **{budget} ({tier_desc})**")
+    if has_no_interest_preference(cat_scores):
+        st.warning("ไม่พบคณะที่เข้ากันได้จากความชอบ เนื่องจากคะแนนความชอบทุกหมวดเป็น 0 "
+                   "จึงแสดงผลคณะที่เข้ากับ MBTI ให้แทน")
 
     if top10:
         # คณะที่ Match สูงสุด 3 อันดับ แสดงก่อนตาราง

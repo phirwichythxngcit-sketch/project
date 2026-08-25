@@ -95,6 +95,18 @@ class InterestQuestionParsingTests(unittest.TestCase):
         )
 
 
+class InterestPreferenceStatusTests(unittest.TestCase):
+    def test_all_zero_interest_scores_show_the_mbti_only_notice(self):
+        self.assertTrue(app.has_no_interest_preference({
+            "M": 0, "S": 0, "L": 0, "H": 0, "A": 0,
+        }))
+
+    def test_any_nonzero_interest_score_does_not_show_the_mbti_only_notice(self):
+        self.assertFalse(app.has_no_interest_preference({
+            "M": 0, "S": 0, "L": 1, "H": 0, "A": 0,
+        }))
+
+
 class FacultyRankingTests(unittest.TestCase):
     def setUp(self):
         self.original_faculties = app.FACULTIES
