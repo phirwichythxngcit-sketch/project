@@ -74,10 +74,17 @@ h1,h2,h3,h4,h5,.stMarkdown h1,.stMarkdown h2,.stMarkdown h3,.stMarkdown h4,
 h1,h2{letter-spacing:.005em}
 
 /* ---------- long Thai application title ---------- */
+.app-title{
+    font-family:'Prompt','Sarabun',sans-serif;
+    font-size:clamp(2rem,2.65vw,2.65rem);
+    font-weight:700;
+    line-height:1.34;
+    letter-spacing:.005em;
+    margin:0 0 .7rem;
+}
 h1,.stMarkdown h1{
-    font-size:clamp(2rem,3.4vw,3.25rem);
-    line-height:1.28;
-    max-width:22ch;
+    font-size:clamp(2rem,2.65vw,2.65rem);
+    line-height:1.34;
     margin-bottom:.7rem;
 }
 [data-testid="stSidebar"] h2,
@@ -587,7 +594,11 @@ def is_admin_password(password):
 
 # ---------------------------------------------------------------- pages
 def page_welcome():
-    st.title("วางแผนการศึกษาต่อในระดับอุดมศึกษาของนักเรียนโรงเรียนสองพิทยาคม")
+    st.markdown(
+        '<h1 class="app-title">วางแผนการศึกษาต่อในระดับอุดมศึกษา<br>'
+        'ของนักเรียนโรงเรียนสองพิทยาคม</h1>',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         "แอปนี้ช่วยให้คุณรู้จักตัวเองมากขึ้น "
         "แล้วจับคู่กับ **คณะ/สาขาที่เหมาะกับคุณ** ผ่าน 3 ส่วนประกอบ:"
