@@ -87,6 +87,14 @@ h1,.stMarkdown h1{
     line-height:1.34;
     margin-bottom:.7rem;
 }
+.sidebar-title{
+    font-family:'Prompt','Sarabun',sans-serif;
+    font-size:1.08rem;
+    font-weight:700;
+    line-height:1.5;
+    letter-spacing:0;
+    margin:0 0 .8rem;
+}
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] .stMarkdown h2{
     font-size:1.08rem;
@@ -984,7 +992,12 @@ def main():
     survey = parse_interest_questions(interest_file.stat().st_mtime_ns)
 
     with st.sidebar:
-        st.header("วางแผนการศึกษาต่อในระดับอุดมศึกษาของนักเรียนโรงเรียนสองพิทยาคม")
+        st.markdown(
+            '<div class="sidebar-title">วางแผนการศึกษาต่อ<br>'
+            'ระดับอุดมศึกษาของนักเรียน<br>'
+            'โรงเรียนสองพิทยาคม</div>',
+            unsafe_allow_html=True,
+        )
         done_flags = [
             ("1. เริ่มต้น", bool(st.session_state["name"])),
             ("2. ผล MBTI", st.session_state["function_strengths"] is not None),
