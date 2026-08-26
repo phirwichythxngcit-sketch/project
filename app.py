@@ -135,9 +135,6 @@ input:focus,[data-baseweb="select"]>div:focus-within{
 
 /* ---------- agreement scale: custom 0–5 circle buttons ---------- */
 .agreement-question{font-weight:600;margin:.95rem 0 .3rem;}
-.agreement-labels{display:flex;justify-content:space-between;gap:1rem;
-    margin:.15rem 0 .4rem;color:#5B7B6F;font-size:.84rem;font-weight:600;}
-.agreement-labels span:last-child{color:#C9962F;text-align:right;}
 [class*="st-key-score_"][class*="_option_"] button{
     width:52px !important;height:52px !important;min-height:52px !important;
     padding:0 !important;border-radius:999px !important;background:#fff !important;
@@ -160,11 +157,10 @@ input:focus,[data-baseweb="select"]>div:focus-within{
 @media (max-width: 640px){
     [class*="st-key-score_"][class*="_option_"] button{
         width:46px !important;height:46px !important;min-height:46px !important;}
-    .agreement-labels{font-size:.76rem;}
 }
 
 /* ---------- progress ---------- */
-[data-testid="stProgress"]{height:9px;border-radius:999px;
+[data-testid="stProgress"] [role="progressbar"]{height:9px;border-radius:999px;
     background:rgba(15,118,110,.14);overflow:hidden;}
 
 /* ---------- alerts / expanders ---------- */
@@ -719,11 +715,6 @@ def render_agreement_selector(question, key, default=None):
 
     st.markdown(f'<div class="agreement-question">{html.escape(question)}</div>',
                 unsafe_allow_html=True)
-    st.markdown(
-        '<div class="agreement-labels"><span>ไม่เห็นด้วยอย่างยิ่ง</span>'
-        '<span>เห็นด้วยอย่างยิ่ง</span></div>',
-        unsafe_allow_html=True,
-    )
     cols = st.columns(6)
     for score, col in enumerate(cols):
         selected = st.session_state.get(state_key) == score
@@ -832,7 +823,8 @@ def page_function_test(fn_questions):
     idx = st.session_state["fn_index"]
     func = FN_ORDER[idx]
     done = len(st.session_state["func_raw"])
-    st.progress(done / 8, text=f"ความคืบหน้า {done}/8 ฟังก์ชัน")
+    st.caption(f"ความคืบหน้า {done}/8 ฟังก์ชัน")
+    st.progress(done / 8)
     st.header(f"ฟังก์ชัน {func} — {FN_TH[func]}")
     st.caption(f"หน้า {idx + 1} / 8 · ข้อ {idx * 10 + 1}–{idx * 10 + 10}")
 
@@ -906,8 +898,9 @@ def page_interest_survey(survey):
     idx = st.session_state["interest_index"]
     cat = CAT_ORDER[idx]
     block = survey[cat]
-    st.progress(len(st.session_state["interest_answers"]) / 5,
-                text=f"หมวดที่ {len(st.session_state['interest_answers'])}/5 เสร็จสิ้น")
+    completed = len(st.session_state["interest_answers"])
+    st.caption(f"ความคืบหน้า: ทำเสร็จแล้ว {completed}/5 หมวด")
+    st.progress(completed / 5)
     st.header(f"หมวด {idx + 1}/5: {block['title']}")
     st.caption("เลือกคำตอบที่ใกล้กับความเห็นของคุณที่สุด (0–5)")
 
